@@ -1,3 +1,4 @@
+<div align="center">
 # SAT Messenger
 
 > A modern messaging platform built by SAT Limited.
@@ -300,7 +301,7 @@ Suggestions, bug reports and improvements are welcome as the project grows.
 
 This project is licensed under the Apache License 2.0.
 
-See the LICENSE file for details.
+See the [LICENSE](https://github.com/SAT-Limited-Organization/SAT-Messenger/blob/main/LICENSE) file for details.
 
 
 ---
