@@ -44,11 +44,19 @@
         android:textSize="22sp"
         android:textStyle="bold" />
 
+    <Button
+        android:id="@+id/findPeopleButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:text="FIND PEOPLE" />
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="70dp"
         android:gravity="center"
-        android:layout_marginTop="100dp"
         android:text="No conversations yet"
         android:textSize="18sp" />
 
@@ -57,7 +65,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:gravity="center"
-        android:text="Your conversations will appear here."
+        android:text="Find someone to start chatting."
         android:textSize="15sp" />
 
 </LinearLayout>
