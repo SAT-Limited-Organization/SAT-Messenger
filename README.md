@@ -4,6 +4,8 @@
 ---
 > A modern messaging platform built by SAT Limited.
 
+<div align="normal">
+
 SAT Messenger is a messaging application currently under development, designed to provide fast, simple and reliable communication between users.
 
 The project is being built with Android, Firebase and modern cloud technologies.
