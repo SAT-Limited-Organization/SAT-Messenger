@@ -147,15 +147,14 @@ SAT-Messenger/
 └── README.md
 ```
 
-
 ---
 
-🔥 Firebase Architecture
+## 🔥 Firebase Architecture
 
 SAT Messenger uses Cloud Firestore to organize application data.
 
 Users
-
+```text
 users/
 └── userId/
     ├── displayName
@@ -178,11 +177,10 @@ chats/
             ├── senderId
             ├── text
             └── timestamp
-
-
+```
 ---
 
-🔒 Security
+## 🔒 Security
 
 SAT Messenger uses Firebase Authentication and Firestore Security Rules to control access to application data.
 
@@ -193,7 +191,7 @@ The project will continue to receive security improvements as development progre
 
 ---
 
-🧪 Development
+## 🧪 Development
 
 This project is currently intended for development and testing.
 
@@ -202,7 +200,7 @@ The application should not be considered production-ready until authentication, 
 
 ---
 
-📦 Building
+## 📦 Building
 
 The project can be built automatically through GitHub Actions.
 
@@ -211,7 +209,7 @@ The workflow builds a debug APK and makes the resulting APK available as a GitHu
 
 ---
 
-🗺️ Roadmap
+## 🗺️ Roadmap
 
 Phase 1 — Foundation
 
@@ -224,7 +222,7 @@ Authentication
 User profiles
 
 
-Phase 2 — Messaging
+## Phase 2 — Messaging
 
 Find People
 
@@ -235,7 +233,7 @@ Real-time messages
 Recent conversations
 
 
-Phase 3 — Communication
+## Phase 3 — Communication
 
 Online status
 
@@ -248,7 +246,7 @@ Read receipts
 Push notifications
 
 
-Phase 4 — Media
+## Phase 4 — Media
 
 Profile pictures
 
@@ -257,7 +255,7 @@ Image sharing
 File sharing
 
 
-Phase 5 — Social Messaging
+## Phase 5 — Social Messaging
 
 Group chats
 
@@ -266,7 +264,7 @@ Group management
 Group profiles
 
 
-Phase 6 — Polish
+## Phase 6 — Polish
 
 Dark mode
 
@@ -282,14 +280,14 @@ Security review
 
 ---
 
-📸 Screenshots
+## 📸 Screenshots
 
 Screenshots will be added as the application UI develops.
 
 
 ---
 
-🤝 Contributing
+## 🤝 Contributing
 
 SAT Messenger is currently under active development.
 
@@ -298,7 +296,7 @@ Suggestions, bug reports and improvements are welcome as the project grows.
 
 ---
 
-📄 License
+## 📄 License
 
 This project is licensed under the Apache License 2.0.
 
@@ -307,7 +305,7 @@ See the LICENSE file for details.
 
 ---
 
-🏢 SAT Limited
+## 🏢 SAT Limited
 
 SAT Messenger is a project developed by SAT Limited.
 
