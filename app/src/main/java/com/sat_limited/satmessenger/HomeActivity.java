@@ -18,6 +18,7 @@ public class HomeActivity extends AppCompatActivity {
 
     private TextView welcomeText;
     private Button logoutButton;
+    private Button findPeopleButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,6 +30,7 @@ public class HomeActivity extends AppCompatActivity {
 
         welcomeText = findViewById(R.id.welcomeText);
         logoutButton = findViewById(R.id.logoutButton);
+        findPeopleButton = findViewById(R.id.findPeopleButton);
 
         if (firebaseAuth.getCurrentUser() == null) {
             openLogin();
@@ -41,9 +43,7 @@ public class HomeActivity extends AppCompatActivity {
                 .document(uid)
                 .get()
                 .addOnSuccessListener(document -> {
-
                     if (document.exists()) {
-
                         String name = document.getString("displayName");
 
                         if (name != null && !name.isEmpty()) {
@@ -51,7 +51,6 @@ public class HomeActivity extends AppCompatActivity {
                         } else {
                             welcomeText.setText("Welcome to SAT Messenger!");
                         }
-
                     } else {
                         welcomeText.setText("Welcome to SAT Messenger!");
                     }
@@ -60,11 +59,17 @@ public class HomeActivity extends AppCompatActivity {
                         welcomeText.setText("Welcome to SAT Messenger!")
                 );
 
+        // Open Find People
+        findPeopleButton.setOnClickListener(v -> {
+            Intent intent = new Intent(HomeActivity.this, UsersActivity.class);
+            startActivity(intent);
+        });
+
+        // Logout
         logoutButton.setOnClickListener(v -> logout());
     }
 
     private void logout() {
-
         firebaseAuth.signOut();
 
         Toast.makeText(
@@ -77,11 +82,7 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void openLogin() {
-
-        Intent intent = new Intent(
-                HomeActivity.this,
-                MainActivity.class
-        );
+        Intent intent = new Intent(HomeActivity.this, MainActivity.class);
 
         intent.addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK |
