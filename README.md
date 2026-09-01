@@ -1,6 +1,7 @@
 <div align="center">
-# SAT Messenger
 
+# SAT Messenger
+---
 > A modern messaging platform built by SAT Limited.
 
 SAT Messenger is a messaging application currently under development, designed to provide fast, simple and reliable communication between users.
