@@ -13,6 +13,10 @@
         android:theme="@style/Theme.SATMessenger">
 
        <activity
+           android:name=".ChatActivity"
+           android:exported="false" />
+
+       <activity
            android:name=".HomeActivity"
            android:exported="false" />
 
