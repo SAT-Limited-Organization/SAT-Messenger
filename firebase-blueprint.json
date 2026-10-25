@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and cryptographic public identity for SAT Messenger",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique Firebase user identifier" },
+        "email": { "type": "string", "description": "User Google email address" },
+        "displayName": { "type": "string", "description": "Display name of the user" },
+        "photoURL": { "type": "string", "description": "Profile picture avatar URL" },
+        "publicKey": { "type": "string", "description": "Base64 encoded cryptographic public key for E2EE" },
+        "bio": { "type": "string", "description": "Short user bio or status phrase" },
+        "status": { "type": "string", "description": "Online presence status message" },
+        "isOnline": { "type": "boolean", "description": "Live online indicator" },
+        "activeTheme": { "type": "string", "description": "Custom dark mode theme selection" },
+        "whatsappLinked": { "type": "object", "description": "WhatsApp linked account details (phoneNumber, linkedAt, status, verified)" },
+        "lastSeen": { "type": "string", "description": "ISO timestamp of last activity" },
+        "createdAt": { "type": "string", "description": "User registration timestamp" }
+      },
+      "required": ["userId", "email", "displayName"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A direct, group, or community chat room in SAT Messenger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Conversation ID" },
+        "type": { "type": "string", "enum": ["direct", "group", "community", "google_chat"], "description": "Room type" },
+        "name": { "type": "string", "description": "Room or group name" },
+        "description": { "type": "string", "description": "Community description or room purpose" },
+        "avatar": { "type": "string", "description": "Group or room icon" },
+        "creatorId": { "type": "string", "description": "UID of creator" },
+        "memberIds": { "type": "array", "description": "List of participant user IDs" },
+        "adminIds": { "type": "array", "description": "List of group admin user IDs" },
+        "disappearingTimerSeconds": { "type": "number", "description": "Disappearing message lifetime in seconds (0 for disabled)" },
+        "lastMessageSnippet": { "type": "string", "description": "Summary preview snippet of the latest message" },
+        "lastMessageSenderId": { "type": "string", "description": "UID of the user who sent the latest message" },
+        "lastMessageTimestamp": { "type": "string", "description": "Timestamp of the last sent message" },
+        "encryptionFingerprint": { "type": "string", "description": "Verification fingerprint hash for E2EE security" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["id", "type", "memberIds", "creatorId"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "An end-to-end encrypted message, voice note, document, or location payload",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Message ID" },
+        "conversationId": { "type": "string", "description": "Associated conversation ID" },
+        "senderId": { "type": "string", "description": "UID of the sender" },
+        "senderName": { "type": "string", "description": "Name of the sender" },
+        "senderAvatar": { "type": "string", "description": "Avatar of the sender" },
+        "ciphertext": { "type": "string", "description": "Encrypted message payload or attachment ciphertext" },
+        "iv": { "type": "string", "description": "Initialization vector for AES-GCM" },
+        "authTag": { "type": "string", "description": "Authentication tag for E2EE verification" },
+        "type": { "type": "string", "enum": ["text", "audio", "document", "image", "location"], "description": "Message type" },
+        "textPreview": { "type": "string", "description": "Optional local preview or fallback indicator" },
+        "mediaData": { "type": "string", "description": "Data URL or encoded payload for audio, documents, photos" },
+        "mediaName": { "type": "string", "description": "File name for shared documents or media" },
+        "mediaSize": { "type": "number", "description": "File size in bytes" },
+        "audioDuration": { "type": "number", "description": "Duration in seconds of voice note" },
+        "transcription": { "type": "string", "description": "Automatic speech-to-text transcript of voice note" },
+        "location": { "type": "object", "description": "Latitude, longitude and place name if location message" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"], "description": "Message status" },
+        "readBy": { "type": "array", "description": "List of user IDs who read the message" },
+        "reactions": { "type": "object", "description": "Map of emoji reaction characters to arrays of user IDs who reacted" },
+        "disappearingAfterSeconds": { "type": "number", "description": "Self-destruct timer configured for message" },
+        "expiresAt": { "type": "number", "description": "UNIX timestamp when message must self-destruct" },
+        "createdAt": { "type": "string", "description": "Send timestamp" }
+      },
+      "required": ["id", "conversationId", "senderId", "ciphertext", "type"]
+    },
+    "TypingStatus": {
+      "title": "TypingStatus",
+      "description": "Real-time typing indicator for active conversations",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User ID typing" },
+        "userName": { "type": "string", "description": "User name displayed" },
+        "isTyping": { "type": "boolean", "description": "Current typing activity" },
+        "updatedAt": { "type": "string", "description": "Heartbeat timestamp" }
+      },
+      "required": ["userId", "isTyping"]
+    },
+    "BackupRecord": {
+      "title": "BackupRecord",
+      "description": "Cloud-based encrypted backup record for cross-device message sync",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Backup ID" },
+        "userId": { "type": "string", "description": "User UID who owns the backup" },
+        "backupData": { "type": "string", "description": "Encrypted JSON bundle of all chats and messages" },
+        "checksum": { "type": "string", "description": "SHA-256 integrity hash" },
+        "totalMessages": { "type": "number", "description": "Count of backed up messages" },
+        "deviceLabel": { "type": "string", "description": "Device name or platform that created backup" },
+        "createdAt": { "type": "string", "description": "Backup creation timestamp" }
+      },
+      "required": ["id", "userId", "backupData"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and public key information"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct, group, and community conversations"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "End-to-end encrypted messages and attachments in a conversation"
+    },
+    "/conversations/{conversationId}/typing/{userId}": {
+      "schema": "TypingStatus",
+      "description": "Live typing status indicators for participants"
+    },
+    "/users/{userId}/backups/{backupId}": {
+      "schema": "BackupRecord",
+      "description": "Encrypted cloud backups for multi-device sync"
+    }
+  }
+}

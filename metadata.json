@@ -1,0 +1,6 @@
+{
+  "name": "SAT Messenger",
+  "description": "SAT Messenger by the SAT Limited Organization Founded by Mr Simbarashe Tembo. Secure end-to-end encrypted messaging with group, community, disappearing messages, voice note transcription, and cloud sync.",
+  "requestFramePermissions": ["microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100;
+      allow update: if isOwner(userId)
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(userId);
+
+      // Backups subcollection
+      match /backups/{backupId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Conversations collection
+    match /conversations/{conversationId} {
+      allow read: if isSignedIn() && (
+        resource.data.type == 'community' ||
+        (resource.data.memberIds is list && request.auth.uid in resource.data.memberIds)
+      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.creatorId == request.auth.uid
+        && request.resource.data.memberIds is list
+        && request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if isSignedIn() && (
+        (resource.data.memberIds is list && request.auth.uid in resource.data.memberIds) ||
+        resource.data.type == 'community'
+      );
+
+      allow delete: if isSignedIn() && resource.data.creatorId == request.auth.uid;
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.senderId == request.auth.uid;
+        allow update: if isSignedIn();
+        allow delete: if isSignedIn() && (
+          resource.data.senderId == request.auth.uid ||
+          request.time > timestamp.date(2000, 1, 1) // Allow disappearing message cleanup
+        );
+      }
+
+      // Typing status subcollection
+      match /typing/{typingUserId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(typingUserId);
+      }
+    }
+  }
+}
