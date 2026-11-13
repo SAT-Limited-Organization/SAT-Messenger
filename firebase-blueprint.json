@@ -1,0 +1,241 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public profile and presence of an SAT Messenger user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique user ID matching Auth UID" },
+        "displayName": { "type": "string", "description": "Full name or corporate handle" },
+        "email": { "type": "string", "description": "Corporate or account email" },
+        "phoneNumber": { "type": "string", "description": "Optional contact phone number or extension" },
+        "avatarUrl": { "type": "string", "description": "Optional profile image URL or base64 placeholder" },
+        "statusMessage": { "type": "string", "description": "Current status message or title at SAT Limited" },
+        "isOnline": { "type": "boolean", "description": "Active online presence flag" },
+        "lastSeen": { "type": "string", "format": "date-time", "description": "Last presence timestamp" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account registration timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Profile update timestamp" }
+      },
+      "required": ["userId", "displayName", "email", "createdAt"]
+    },
+    "PrivacySettings": {
+      "title": "PrivacySettings",
+      "description": "User privacy controls and read receipt preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User ID" },
+        "readReceipts": { "type": "boolean", "description": "Whether to share read receipts" },
+        "lastSeenVisible": { "type": "boolean", "description": "Whether last seen status is broadcast" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last settings update timestamp" }
+      },
+      "required": ["userId", "readReceipts", "lastSeenVisible"]
+    },
+    "BlockedUser": {
+      "title": "BlockedUser",
+      "description": "Record of a contact blocked by the user.",
+      "type": "object",
+      "properties": {
+        "blockedUserId": { "type": "string", "description": "ID of blocked user" },
+        "blockedUserName": { "type": "string", "description": "Name of blocked user" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the block occurred" }
+      },
+      "required": ["blockedUserId", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Direct message or group conversation header.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Chat identifier" },
+        "type": { "type": "string", "enum": ["direct", "group"], "description": "Conversation category" },
+        "name": { "type": "string", "description": "Display name of group chat" },
+        "memberIds": { "type": "array", "description": "List of user IDs participating in the conversation" },
+        "adminIds": { "type": "array", "description": "List of group admin user IDs" },
+        "lastMessageText": { "type": "string", "description": "Snippet of last message sent" },
+        "lastSenderId": { "type": "string", "description": "UID of last sender" },
+        "lastSenderName": { "type": "string", "description": "Display name of last sender" },
+        "isTyping": { "type": "object", "description": "Real-time map of user IDs to typing booleans" },
+        "lastTimestamp": { "type": "string", "format": "date-time", "description": "Timestamp of most recent activity" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Chat creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Chat update timestamp" }
+      },
+      "required": ["id", "type", "memberIds", "createdAt"]
+    },
+    "ChatRoom": {
+      "title": "ChatRoom",
+      "description": "Collaborative group chat room for SAT Limited teams with memberIds.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Chat room identifier" },
+        "name": { "type": "string", "description": "Display name of group chat room" },
+        "description": { "type": "string", "description": "Purpose or departmental charter of the room" },
+        "memberIds": { "type": "array", "description": "List of user IDs participating in the chat room" },
+        "adminIds": { "type": "array", "description": "List of room administrators" },
+        "createdBy": { "type": "string", "description": "UID of room creator" },
+        "lastMessageText": { "type": "string", "description": "Snippet of last message sent" },
+        "lastSenderId": { "type": "string", "description": "UID of last sender" },
+        "lastSenderName": { "type": "string", "description": "Display name of last sender" },
+        "isTyping": { "type": "object", "description": "Real-time map of user IDs to typing booleans" },
+        "lastTimestamp": { "type": "string", "format": "date-time", "description": "Timestamp of most recent activity" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Chat room creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Chat room update timestamp" }
+      },
+      "required": ["id", "name", "memberIds", "createdAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Individual message inside a chat room.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Message identifier" },
+        "chatId": { "type": "string", "description": "Parent chat identifier" },
+        "senderId": { "type": "string", "description": "UID of sender" },
+        "senderName": { "type": "string", "description": "Display name of sender" },
+        "text": { "type": "string", "description": "Text payload of message" },
+        "type": { "type": "string", "enum": ["text", "image", "file"], "description": "Content type" },
+        "attachmentUrl": { "type": "string", "description": "Optional media attachment URL or base64" },
+        "replyToId": { "type": "string", "description": "Optional ID of message replied to" },
+        "replyToText": { "type": "string", "description": "Optional snippet of quoted message" },
+        "replyToSender": { "type": "string", "description": "Optional sender of quoted message" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"], "description": "Delivery status" },
+        "readBy": { "type": "object", "description": "Map of user IDs to their boolean read status" },
+        "reactions": { "type": "object", "description": "Map of user IDs to their chosen emoji reaction" },
+        "fileName": { "type": "string", "description": "Optional name of uploaded file" },
+        "fileSize": { "type": "integer", "description": "Optional file size in bytes" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "deleted": { "type": "boolean", "description": "Soft delete tombstone flag" }
+      },
+      "required": ["id", "chatId", "senderId", "senderName", "memberIds", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Abuse or violation report submitted by a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Report identifier" },
+        "reporterId": { "type": "string", "description": "UID of user filing the report" },
+        "reportedUserId": { "type": "string", "description": "UID of reported user" },
+        "reason": { "type": "string", "description": "Reason category for report" },
+        "details": { "type": "string", "description": "Detailed explanation" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of report" }
+      },
+      "required": ["id", "reporterId", "reportedUserId", "reason", "createdAt"]
+    },
+    "StatusItem": {
+      "title": "StatusItem",
+      "description": "Ephemeral 24-hour status update like WhatsApp.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Status identifier" },
+        "userId": { "type": "string", "description": "Author user ID" },
+        "userName": { "type": "string", "description": "Author display name" },
+        "userAvatarUrl": { "type": "string", "description": "Author avatar URL" },
+        "text": { "type": "string", "description": "Status caption or text" },
+        "mediaUrl": { "type": "string", "description": "Optional image URL" },
+        "backgroundColor": { "type": "string", "description": "Background color code" },
+        "viewerIds": { "type": "array", "description": "List of user IDs who viewed the status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Status creation timestamp" },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Status expiration timestamp" }
+      },
+      "required": ["id", "userId", "userName", "createdAt"]
+    },
+    "Channel": {
+      "title": "Channel",
+      "description": "Public or corporate broadcast channel like WhatsApp.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Channel identifier" },
+        "name": { "type": "string", "description": "Channel name" },
+        "description": { "type": "string", "description": "Channel description" },
+        "iconUrl": { "type": "string", "description": "Channel avatar/icon" },
+        "creatorId": { "type": "string", "description": "Creator user ID" },
+        "adminIds": { "type": "array", "description": "Admins permitted to broadcast" },
+        "subscriberIds": { "type": "array", "description": "Followers subscribed to updates" },
+        "followerCount": { "type": "integer", "description": "Total followers count" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "name", "creatorId", "createdAt"]
+    },
+    "ChannelPost": {
+      "title": "ChannelPost",
+      "description": "Broadcast post inside a channel.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Post identifier" },
+        "channelId": { "type": "string", "description": "Parent channel ID" },
+        "authorId": { "type": "string", "description": "Author admin ID" },
+        "authorName": { "type": "string", "description": "Author name" },
+        "text": { "type": "string", "description": "Broadcast text" },
+        "mediaUrl": { "type": "string", "description": "Optional broadcast media URL" },
+        "reactions": { "type": "object", "description": "Map of emojis to counts" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["id", "channelId", "authorId", "authorName", "createdAt"]
+    },
+    "Community": {
+      "title": "Community",
+      "description": "Umbrella community grouping multiple chat rooms like WhatsApp.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Community identifier" },
+        "name": { "type": "string", "description": "Community name" },
+        "description": { "type": "string", "description": "Community purpose" },
+        "iconUrl": { "type": "string", "description": "Community icon" },
+        "creatorId": { "type": "string", "description": "Creator user ID" },
+        "adminIds": { "type": "array", "description": "Community admins" },
+        "memberIds": { "type": "array", "description": "Community members" },
+        "subgroupChatIds": { "type": "array", "description": "Linked chat rooms under this community" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "name", "creatorId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile and presence registry"
+    },
+    "/users/{userId}/settings/privacy": {
+      "schema": { "$ref": "#/entities/PrivacySettings" },
+      "description": "Private settings for the user"
+    },
+    "/users/{userId}/blocked/{blockedId}": {
+      "schema": { "$ref": "#/entities/BlockedUser" },
+      "description": "List of blocked users"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Conversation threads and direct chats"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages posted in direct chats"
+    },
+    "/chatRooms/{roomId}": {
+      "schema": { "$ref": "#/entities/ChatRoom" },
+      "description": "Group chat rooms"
+    },
+    "/statuses/{statusId}": {
+      "schema": { "$ref": "#/entities/StatusItem" },
+      "description": "24-hour status updates"
+    },
+    "/channels/{channelId}": {
+      "schema": { "$ref": "#/entities/Channel" },
+      "description": "Broadcast channels"
+    },
+    "/channels/{channelId}/posts/{postId}": {
+      "schema": { "$ref": "#/entities/ChannelPost" },
+      "description": "Channel broadcast posts"
+    },
+    "/communities/{communityId}": {
+      "schema": { "$ref": "#/entities/Community" },
+      "description": "Communities grouping chat rooms"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Abuse and violation reports"
+    }
+  }
+}

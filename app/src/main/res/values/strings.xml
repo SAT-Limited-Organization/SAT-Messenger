@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">SAT Messenger</string>
+    <string name="notification_channel_messages_name">Direct &amp; Group Messages</string>
+    <string name="notification_channel_messages_desc">Incoming messages and mentions from colleagues and group rooms</string>
+    <string name="notification_channel_updates_name">Channels &amp; Alerts</string>
+    <string name="notification_channel_updates_desc">Broadcast updates and system notification tests</string>
+    <string name="test_notification_title">SAT Messenger Notifications Active</string>
+    <string name="test_notification_body">System notifications are enabled. New incoming messages will appear in your phone Notification Center.</string>
+    <string name="sign_in_google">Continue with Google</string>
+    <string name="sign_in_microsoft">Continue with Microsoft</string>
+    <string name="sign_in_or_divider">Enterprise &amp; Personal Identity</string>
+    <string name="auth_provider_google">Google</string>
+    <string name="auth_provider_microsoft">Microsoft</string>
+    <string name="voice_record_hint">Recording voice note…</string>
+    <string name="voice_permission_denied">Microphone permission is required to record voice clips.</string>
+    <string name="voice_message_label">Voice message</string>
+</resources>

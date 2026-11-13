@@ -1,0 +1,6 @@
+{
+  "name": "SAT Messenger",
+  "description": "Production-grade native Android messaging app for SAT Limited with real-time 1-on-1 and group chats, media sharing, and presence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
