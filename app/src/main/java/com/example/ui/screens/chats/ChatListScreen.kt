@@ -35,9 +35,9 @@ import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonSearch
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -75,19 +75,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.Channel
 import com.example.data.model.Chat
 import com.example.data.model.Community
+import com.example.data.model.ContactEntry
 import com.example.data.model.StatusItem
 import com.example.data.model.UserProfile
 import com.example.ui.components.EmptyStateView
 import com.example.ui.components.UserAvatar
 import com.example.ui.screens.channels.ChannelsScreen
 import com.example.ui.screens.communities.CommunitiesScreen
+import com.example.ui.screens.contacts.ContactsScreen
 import com.example.ui.screens.status.StatusScreen
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
@@ -101,7 +106,7 @@ enum class MainNavTab {
     CHATS,
     UPDATES,
     COMMUNITIES,
-    DIRECTORY
+    CONTACTS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,6 +116,7 @@ fun ChatListScreen(
     userProfile: UserProfile?,
     chats: List<Chat>,
     directoryUsers: List<UserProfile>,
+    savedContacts: List<ContactEntry> = emptyList(),
     statuses: List<StatusItem>,
     channels: List<Channel>,
     communities: List<Community>,
@@ -136,6 +142,8 @@ fun ChatListScreen(
     onOpenJoinInvite: () -> Unit = {},
     onOpenUserSearch: () -> Unit,
     onDirectMessageUser: (UserProfile) -> Unit,
+    onUpdateAvailability: (AvailabilityStatus) -> Unit = {},
+    onToggleFriendContact: (UserProfile) -> Unit = {},
     showNotificationPermissionBanner: Boolean = false,
     onEnableNotificationsClick: () -> Unit = {},
     onDismissNotificationBanner: () -> Unit = {},
@@ -198,10 +206,10 @@ fun ChatListScreen(
                         Column {
                             Text(
                                 text = when (selectedNavTab) {
-                                    MainNavTab.CHATS -> "SAT Messenger"
+                                    MainNavTab.CHATS -> stringResource(R.string.app_name)
                                     MainNavTab.UPDATES -> "Updates"
                                     MainNavTab.COMMUNITIES -> "Communities"
-                                    MainNavTab.DIRECTORY -> "Colleague Directory"
+                                    MainNavTab.CONTACTS -> stringResource(R.string.contacts_title)
                                 },
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
@@ -276,6 +284,7 @@ fun ChatListScreen(
                             name = userProfile?.displayName ?: "Me",
                             avatarUrl = userProfile?.avatarUrl,
                             isOnline = userProfile?.isOnline ?: true,
+                            availabilityStatus = userProfile?.resolvedAvailability(),
                             size = 36.dp
                         )
                     }
@@ -342,15 +351,20 @@ fun ChatListScreen(
                 )
 
                 NavigationBarItem(
-                    selected = selectedNavTab == MainNavTab.DIRECTORY,
-                    onClick = { selectedNavTab = MainNavTab.DIRECTORY },
-                    icon = { Icon(imageVector = Icons.Default.PersonSearch, contentDescription = "Search") },
-                    label = { Text("Search", fontWeight = if (selectedNavTab == MainNavTab.DIRECTORY) FontWeight.Bold else FontWeight.Normal) },
+                    selected = selectedNavTab == MainNavTab.CONTACTS,
+                    onClick = { selectedNavTab = MainNavTab.CONTACTS },
+                    icon = { Icon(imageVector = Icons.Default.People, contentDescription = stringResource(R.string.contacts_tab_label)) },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.contacts_tab_label),
+                            fontWeight = if (selectedNavTab == MainNavTab.CONTACTS) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = SatTeal,
                         indicatorColor = SatTeal.copy(alpha = 0.15f)
                     ),
-                    modifier = Modifier.testTag("tab_directory")
+                    modifier = Modifier.testTag("tab_contacts")
                 )
             }
         },
@@ -455,11 +469,16 @@ fun ChatListScreen(
                     )
                 }
 
-                MainNavTab.DIRECTORY -> {
-                    DirectoryTabContent(
-                        directoryUsers = directoryUsers,
+                MainNavTab.CONTACTS -> {
+                    ContactsScreen(
                         currentUserId = currentUserId,
-                        onDirectMessageUser = onDirectMessageUser
+                        currentUserProfile = userProfile,
+                        directoryUsers = directoryUsers,
+                        savedContacts = savedContacts,
+                        onDirectMessageUser = onDirectMessageUser,
+                        onUpdateAvailability = onUpdateAvailability,
+                        onToggleFriend = onToggleFriendContact,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
@@ -666,6 +685,7 @@ private fun ChatsTabContent(
                                 name = title,
                                 avatarUrl = otherUser?.avatarUrl,
                                 isOnline = if (isGroup) false else isOtherOnline,
+                                availabilityStatus = if (isGroup) null else otherUser?.resolvedAvailability(),
                                 isGroup = isGroup,
                                 hasStatus = hasActiveStatus,
                                 statusRingColor = SatOnlineGreen,
@@ -899,142 +919,6 @@ private fun ChatsTabContent(
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun DirectoryTabContent(
-    directoryUsers: List<UserProfile>,
-    currentUserId: String,
-    onDirectMessageUser: (UserProfile) -> Unit
-) {
-    var searchQuery by remember { mutableStateOf("") }
-
-    val filtered = remember(directoryUsers, searchQuery, currentUserId) {
-        val query = searchQuery.trim()
-        val others = directoryUsers.filter { it.userId != currentUserId }
-        if (query.isBlank()) others
-        else others.filter { user ->
-            user.displayName.contains(query, ignoreCase = true) ||
-                    user.email.contains(query, ignoreCase = true) ||
-                    (user.phoneNumber != null && user.phoneNumber.contains(query, ignoreCase = true)) ||
-                    (user.statusMessage?.contains(query, ignoreCase = true) == true)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search by user name, email, or phone number...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = SatTeal) },
-            trailingIcon = {
-                if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear")
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("directory_search_input")
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = "${filtered.size} registered SAT employees",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            if (filtered.isEmpty()) {
-                item {
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp)
-                        ) {
-                            Text(text = "No colleagues found matching \"$searchQuery\"", fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Try searching by display name, corporate email address, or phone number.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            } else {
-                items(filtered, key = { it.userId }) { user ->
-                    val query = searchQuery.trim()
-                    val matchedPhone = query.isNotBlank() && user.phoneNumber?.contains(query, ignoreCase = true) == true
-                    val matchedEmail = query.isNotBlank() && user.email.contains(query, ignoreCase = true)
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onDirectMessageUser(user) }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        UserAvatar(
-                            name = user.displayName,
-                            avatarUrl = user.avatarUrl,
-                            isOnline = user.isOnline,
-                            size = 48.dp
-                        )
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = user.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Email, contentDescription = null, tint = if (matchedEmail) SatTeal else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = user.email,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (matchedEmail) SatTeal else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (matchedEmail) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                            if (!user.phoneNumber.isNullOrBlank()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Phone, contentDescription = null, tint = if (matchedPhone) SatElectricBlue else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = user.phoneNumber,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (matchedPhone) SatElectricBlue else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = if (matchedPhone) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            }
-                        }
-                        IconButton(onClick = { onDirectMessageUser(user) }) {
-                            Icon(imageVector = Icons.Default.Message, contentDescription = "Chat", tint = SatElectricBlue)
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
-                }
-            }
-        }
     }
 }
 

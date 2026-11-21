@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,7 +39,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -59,6 +67,7 @@ import com.example.R
 import com.example.data.repository.AuthProvider
 import com.example.data.repository.AuthUiState
 import com.example.ui.components.ErrorCard
+import com.example.ui.screens.manual.AppManualScreen
 import com.example.ui.theme.GoogleBrandBlue
 import com.example.ui.theme.GoogleBrandGreen
 import com.example.ui.theme.GoogleBrandRed
@@ -78,9 +87,11 @@ fun SignInScreen(
     onGoogleSignInClick: (Activity) -> Unit,
     onMicrosoftSignInClick: (Activity) -> Unit,
     onDismissError: () -> Unit = {},
+    onOpenManual: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var showInlineManual by remember { mutableStateOf(false) }
     val isLoading = authState is AuthUiState.Loading
     val isGoogleLoading = isLoading && (activeProvider == AuthProvider.GOOGLE || activeProvider == null)
     val isMicrosoftLoading = isLoading && activeProvider == AuthProvider.MICROSOFT
@@ -339,7 +350,68 @@ fun SignInScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Registration-site Copy of the App Manual & User Guide
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = SatTeal.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            if (onOpenManual != null) {
+                                onOpenManual()
+                            } else {
+                                showInlineManual = true
+                            }
+                        }
+                        .testTag("registration_manual_button")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SatTeal.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                                contentDescription = stringResource(R.string.registration_manual_button),
+                                tint = SatTeal,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.registration_manual_button),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.registration_manual_subtitle),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = "Compliant with SAT Limited Data Governance and Access Control Policies.",
@@ -348,6 +420,17 @@ fun SignInScreen(
                     textAlign = TextAlign.Center
                 )
             }
+        }
+    }
+
+    if (showInlineManual) {
+        Dialog(
+            onDismissRequest = { showInlineManual = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            AppManualScreen(
+                onBack = { showInlineManual = false }
+            )
         }
     }
 }

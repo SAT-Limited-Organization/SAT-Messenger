@@ -83,9 +83,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.audio.formatAudioDuration
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.Chat
 import com.example.data.model.Message
 import com.example.data.model.UserProfile
+import com.example.ui.components.AvailabilityStatusPill
 import com.example.ui.components.UserAvatar
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
@@ -135,6 +137,7 @@ fun ChatDetailsScreen(
 
     val title = if (isGroup) chat.name?.takeIf { it.isNotBlank() } ?: "Group Room" else otherNameOrUsername
     val isOnline = otherUser?.isOnline ?: false
+    val otherAvailability = otherUser?.resolvedAvailability() ?: AvailabilityStatus.OFFLINE
 
     var isMuted by remember { mutableStateOf(false) }
     var participantSearch by remember { mutableStateOf("") }
@@ -214,6 +217,7 @@ fun ChatDetailsScreen(
                             name = title,
                             avatarUrl = otherUser?.avatarUrl,
                             isOnline = if (isGroup) false else isOnline,
+                            availabilityStatus = if (isGroup) null else otherAvailability,
                             isGroup = isGroup,
                             size = 96.dp
                         )
@@ -237,7 +241,16 @@ fun ChatDetailsScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (!isGroup) {
+                            AvailabilityStatusPill(
+                                status = otherAvailability,
+                                lastSeen = otherUser?.lastSeen,
+                                showOfflineLastSeen = true
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
 
                         if (!isGroup && otherUser?.phoneNumber != null) {
                             Text(
@@ -249,17 +262,13 @@ fun ChatDetailsScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                         }
 
-                        Text(
-                            text = if (isGroup) "Group Room • ${chat.memberIds.size} participants"
-                            else if (isOnline) "Active Now • SAT Limited"
-                            else {
-                                val lastSeen = otherUser?.lastSeen?.toDate()
-                                if (lastSeen != null) "Last seen ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(lastSeen)}"
-                                else "Offline • SAT Limited"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.75f)
-                        )
+                        if (isGroup) {
+                            Text(
+                                text = "Group Room • ${chat.memberIds.size} participants",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.75f)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(18.dp))
 

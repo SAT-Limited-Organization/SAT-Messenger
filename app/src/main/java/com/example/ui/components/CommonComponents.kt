@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -40,15 +42,88 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.data.model.AvailabilityStatus
 import com.example.ui.theme.SatElectricBlue
+import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatOnlineGreen
+import com.example.ui.theme.SatSlate400
 import com.example.ui.theme.SatTeal
+import com.example.ui.theme.SatWarningAmber
+import com.google.firebase.Timestamp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+fun availabilityColor(status: AvailabilityStatus): Color {
+    return when (status) {
+        AvailabilityStatus.AVAILABLE -> SatOnlineGreen
+        AvailabilityStatus.BUSY -> SatErrorRed
+        AvailabilityStatus.AWAY -> SatWarningAmber
+        AvailabilityStatus.IN_MEETING -> SatElectricBlue
+        AvailabilityStatus.DO_NOT_DISTURB -> SatErrorRed
+        AvailabilityStatus.OFFLINE -> SatSlate400
+    }
+}
+
+fun formatLastSeenRelative(timestamp: Timestamp?): String {
+    if (timestamp == null) return "Offline"
+    val diffMs = (System.currentTimeMillis() - timestamp.toDate().time).coerceAtLeast(0L)
+    val mins = diffMs / 60_000L
+    val hours = diffMs / 3_600_000L
+    return when {
+        mins < 1 -> "Last seen just now"
+        mins < 60 -> "Last seen ${mins}m ago"
+        hours < 24 -> "Last seen ${hours}h ago"
+        else -> "Last seen ${SimpleDateFormat("MMM d", Locale.getDefault()).format(timestamp.toDate())}"
+    }
+}
+
+@Composable
+fun AvailabilityStatusPill(
+    status: AvailabilityStatus,
+    lastSeen: Timestamp? = null,
+    showOfflineLastSeen: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val dotColor = availabilityColor(status)
+    val labelText = if (status == AvailabilityStatus.OFFLINE && showOfflineLastSeen && lastSeen != null) {
+        formatLastSeenRelative(lastSeen)
+    } else {
+        status.label
+    }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = dotColor.copy(alpha = 0.14f),
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .background(dotColor, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(
+                text = labelText,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (status == AvailabilityStatus.OFFLINE) MaterialTheme.colorScheme.onSurfaceVariant else dotColor
+            )
+        }
+    }
+}
 
 @Composable
 fun UserAvatar(
     name: String,
     avatarUrl: String? = null,
     isOnline: Boolean = false,
+    availabilityStatus: AvailabilityStatus? = null,
     isGroup: Boolean = false,
     size: Dp = 48.dp,
     hasStatus: Boolean = false,
@@ -113,13 +188,15 @@ fun UserAvatar(
             }
         }
 
-        if (isOnline && !isGroup) {
+        val showDot = !isGroup && (availabilityStatus != null || isOnline)
+        if (showDot) {
             val badgeSize = (size * 0.28f).coerceAtLeast(10.dp)
+            val badgeColor = availabilityStatus?.let { availabilityColor(it) } ?: SatOnlineGreen
             Box(
                 modifier = Modifier
                     .size(badgeSize)
                     .align(Alignment.BottomEnd)
-                    .background(SatOnlineGreen, CircleShape)
+                    .background(badgeColor, CircleShape)
                     .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
             )
         }

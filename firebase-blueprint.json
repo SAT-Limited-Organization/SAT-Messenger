@@ -11,12 +11,26 @@
         "phoneNumber": { "type": "string", "description": "Optional contact phone number or extension" },
         "avatarUrl": { "type": "string", "description": "Optional profile image URL or base64 placeholder" },
         "statusMessage": { "type": "string", "description": "Current status message or title at SAT Limited" },
+        "availabilityStatus": { "type": "string", "enum": ["Available", "Busy", "Away", "In a Meeting", "Do Not Disturb", "Offline"], "description": "Real-time presence availability status" },
         "isOnline": { "type": "boolean", "description": "Active online presence flag" },
         "lastSeen": { "type": "string", "format": "date-time", "description": "Last presence timestamp" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Account registration timestamp" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Profile update timestamp" }
       },
       "required": ["userId", "displayName", "email", "createdAt"]
+    },
+    "ContactEntry": {
+      "title": "ContactEntry",
+      "description": "Friend or colleague bookmark entry synced per user.",
+      "type": "object",
+      "properties": {
+        "contactUserId": { "type": "string", "description": "Target user ID" },
+        "relationship": { "type": "string", "enum": ["friend", "colleague"], "description": "Relationship label" },
+        "nickname": { "type": "string", "description": "Optional contact nickname" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["contactUserId", "relationship", "createdAt"]
     },
     "PrivacySettings": {
       "title": "PrivacySettings",
@@ -92,7 +106,7 @@
         "senderId": { "type": "string", "description": "UID of sender" },
         "senderName": { "type": "string", "description": "Display name of sender" },
         "text": { "type": "string", "description": "Text payload of message" },
-        "type": { "type": "string", "enum": ["text", "image", "file"], "description": "Content type" },
+        "type": { "type": "string", "enum": ["text", "image", "file", "audio"], "description": "Content type" },
         "attachmentUrl": { "type": "string", "description": "Optional media attachment URL or base64" },
         "replyToId": { "type": "string", "description": "Optional ID of message replied to" },
         "replyToText": { "type": "string", "description": "Optional snippet of quoted message" },
@@ -102,6 +116,7 @@
         "reactions": { "type": "object", "description": "Map of user IDs to their chosen emoji reaction" },
         "fileName": { "type": "string", "description": "Optional name of uploaded file" },
         "fileSize": { "type": "integer", "description": "Optional file size in bytes" },
+        "durationSeconds": { "type": "integer", "description": "Optional voice clip duration in seconds" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
         "deleted": { "type": "boolean", "description": "Soft delete tombstone flag" }
       },
@@ -204,6 +219,10 @@
     "/users/{userId}/blocked/{blockedId}": {
       "schema": { "$ref": "#/entities/BlockedUser" },
       "description": "List of blocked users"
+    },
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": { "$ref": "#/entities/ContactEntry" },
+      "description": "Saved friends and colleague bookmarks"
     },
     "/chats/{chatId}": {
       "schema": { "$ref": "#/entities/Chat" },

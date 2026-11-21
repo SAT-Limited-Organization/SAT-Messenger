@@ -4,11 +4,13 @@ import android.app.Activity
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.BlockedUser
 import com.example.data.model.Channel
 import com.example.data.model.ChannelPost
 import com.example.data.model.Chat
 import com.example.data.model.Community
+import com.example.data.model.ContactEntry
 import com.example.data.model.InviteLink
 import com.example.data.model.Message
 import com.example.data.model.PrivacySettings
@@ -75,6 +77,9 @@ class MessengerViewModel(
 
     private val _directoryUsers = MutableStateFlow<List<UserProfile>>(emptyList())
     val directoryUsers: StateFlow<List<UserProfile>> = _directoryUsers.asStateFlow()
+
+    private val _savedContacts = MutableStateFlow<List<ContactEntry>>(emptyList())
+    val savedContacts: StateFlow<List<ContactEntry>> = _savedContacts.asStateFlow()
 
     private val _statuses = MutableStateFlow<List<StatusItem>>(emptyList())
     val statuses: StateFlow<List<StatusItem>> = _statuses.asStateFlow()
@@ -192,14 +197,15 @@ class MessengerViewModel(
             ?: "SAT Member"
         _linkedProviderIds.value = authRepository.getLinkedProviderIds()
 
-        // Setup profile in Firestore if not already present
+        // Setup or sync profile presence in Firestore
         viewModelScope.launch {
-            userRepository.saveProfile(
+            userRepository.ensureProfileSynced(
                 UserProfile(
                     userId = uid,
                     displayName = displayName,
                     email = resolvedEmail,
                     avatarUrl = user.photoUrl?.toString(),
+                    availabilityStatus = AvailabilityStatus.AVAILABLE.label,
                     isOnline = true
                 )
             )
@@ -304,10 +310,17 @@ class MessengerViewModel(
             }
         }
 
-        // Observe colleague directory
+        // Observe colleague & friend directory
         viewModelScope.launch {
             userRepository.searchUsers("").collectLatest { users ->
                 _directoryUsers.value = users.filter { it.userId != uid }
+            }
+        }
+
+        // Observe saved contacts (friends / pinned colleagues)
+        viewModelScope.launch {
+            userRepository.observeSavedContacts(uid).collectLatest { contacts ->
+                _savedContacts.value = contacts
             }
         }
 
@@ -374,6 +387,8 @@ class MessengerViewModel(
         _inAppNotification.value = null
         _chats.value = emptyList()
         _messages.value = emptyList()
+        _directoryUsers.value = emptyList()
+        _savedContacts.value = emptyList()
         _userProfile.value = null
         _activeChat.value = null
         _activeChannel.value = null
@@ -651,6 +666,11 @@ class MessengerViewModel(
 
     fun setAppInForeground(inForeground: Boolean) {
         _isAppInForeground.value = inForeground
+        if (authState.value is AuthUiState.Authenticated) {
+            viewModelScope.launch {
+                userRepository.updatePresence(inForeground)
+            }
+        }
     }
 
     fun setSystemNotificationsEnabled(enabled: Boolean) {
@@ -751,6 +771,42 @@ class MessengerViewModel(
                 )
             )
             _toastMessage.value = "Profile updated."
+        }
+    }
+
+    fun updateAvailabilityStatus(status: AvailabilityStatus) {
+        viewModelScope.launch {
+            val result = userRepository.updateAvailabilityStatus(status)
+            result.onSuccess {
+                _toastMessage.value = "Availability set to ${status.label}."
+            }.onFailure { err ->
+                _toastMessage.value = "Failed to update availability: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun toggleFriendContact(targetUser: UserProfile) {
+        val isAlreadyFriend = _savedContacts.value.any {
+            it.contactUserId == targetUser.userId && it.relationship == "friend"
+        }
+        viewModelScope.launch {
+            val result = if (isAlreadyFriend) {
+                userRepository.removeSavedContact(targetUser.userId)
+            } else {
+                userRepository.setContactRelationship(
+                    targetUserId = targetUser.userId,
+                    relationship = "friend"
+                )
+            }
+            result.onSuccess {
+                _toastMessage.value = if (isAlreadyFriend) {
+                    "Removed ${targetUser.username} from Friends."
+                } else {
+                    "Added ${targetUser.username} to Friends."
+                }
+            }.onFailure { err ->
+                _toastMessage.value = "Failed to update contact: ${err.localizedMessage}"
+            }
         }
     }
 

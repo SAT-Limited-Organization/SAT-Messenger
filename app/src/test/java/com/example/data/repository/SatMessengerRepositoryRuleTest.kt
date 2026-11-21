@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import com.example.base.FirestoreEmulatorTestBase
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.UserProfile
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.flow.first
@@ -350,6 +351,59 @@ class SatMessengerRepositoryRuleTest : FirestoreEmulatorTestBase() {
                     .first { rooms -> rooms.any { it.id == roomId } }
             }
             assertTrue(bobRooms.any { it.id == roomId && it.memberIds.contains(bobUid) })
+        }
+    }
+
+    @Test
+    fun contactsAndAvailability_updateAvailabilityAndToggleFriend_succeeds() {
+        runBlocking {
+            val aliceUid = signInTestUser(ALICE_EMAIL)
+            val userRepo = UserRepository(firestore)
+
+            val saveRes = withTimeout(DEFAULT_TIMEOUT_MS) {
+                userRepo.ensureProfileSynced(
+                    UserProfile(
+                        userId = aliceUid,
+                        displayName = "Alice",
+                        email = ALICE_EMAIL,
+                        isOnline = true,
+                        availabilityStatus = AvailabilityStatus.AVAILABLE.label
+                    )
+                )
+            }
+            assertTrue("Expected ensureProfileSynced to succeed", saveRes.isSuccess)
+
+            val availRes = withTimeout(DEFAULT_TIMEOUT_MS) {
+                userRepo.updateAvailabilityStatus(AvailabilityStatus.IN_MEETING)
+            }
+            assertTrue("Expected updateAvailabilityStatus to succeed", availRes.isSuccess)
+
+            val refreshed = withTimeout(DEFAULT_TIMEOUT_MS) {
+                userRepo.getUserProfile(aliceUid)
+            }
+            assertEquals(AvailabilityStatus.IN_MEETING.label, refreshed?.availabilityStatus)
+            assertEquals(AvailabilityStatus.IN_MEETING, refreshed?.resolvedAvailability())
+
+            val bobTarget = UserProfile(
+                userId = "bob_contact_${System.currentTimeMillis()}",
+                displayName = "Bob Colleague",
+                email = BOB_EMAIL
+            )
+            val addFriendRes = withTimeout(DEFAULT_TIMEOUT_MS) {
+                userRepo.setContactRelationship(bobTarget.userId, relationship = "friend")
+            }
+            assertTrue("Expected setContactRelationship to succeed", addFriendRes.isSuccess)
+
+            val observed = withTimeout(FLOW_TIMEOUT_MS) {
+                userRepo.observeSavedContacts(aliceUid)
+                    .first { contacts -> contacts.any { it.contactUserId == bobTarget.userId } }
+            }
+            assertEquals("friend", observed.first { it.contactUserId == bobTarget.userId }.relationship)
+
+            val removeRes = withTimeout(DEFAULT_TIMEOUT_MS) {
+                userRepo.removeSavedContact(bobTarget.userId)
+            }
+            assertTrue("Expected removeSavedContact to succeed", removeRes.isSuccess)
         }
     }
 

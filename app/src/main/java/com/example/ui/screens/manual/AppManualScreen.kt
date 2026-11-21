@@ -26,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -38,13 +37,16 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -95,60 +97,172 @@ private val MANUAL_SECTIONS = listOf(
     ManualSection(
         id = "sign_in",
         category = "Getting Started",
-        title = "Enterprise Authentication & Sign-In",
+        title = "Registration & Sign-In (Google & Microsoft)",
         icon = Icons.Default.Lock,
         badge = "Zero-Trust",
-        summary = "Access SAT Messenger with secure Google Sign-In tied to your enterprise email.",
+        summary = "Register or sign in to SAT Messenger using either your Google or Microsoft account.",
         steps = listOf(
-            "Tap 'Sign in with Google' on the welcome screen.",
-            "Choose your SAT Limited corporate account in the bottom sheet prompt.",
-            "Upon first sign-in, your employee profile is automatically initialized with your name and avatar.",
-            "Your authenticated session persists securely across app relaunches with Google Credential Manager."
+            "On the Sign-In / Registration screen, choose 'Continue with Google' or 'Continue with Microsoft'.",
+            "Complete authentication with your corporate or personal account; your profile is automatically created and synced to Cloud Firestore on first sign-in.",
+            "You can also link a Microsoft account later from Profile > Sign-In Methods.",
+            "Need help before signing in? Tap 'App Manual & User Guide' directly on the Registration / Sign-In screen at any time."
         ),
         tips = listOf(
-            "Anonymous sign-in is disabled to maintain zero-trust corporate security standards.",
-            "You can update your corporate display name and status message anytime from the Profile tab."
+            "Your display name, @username handle, avatar, and real-time availability sync immediately upon registration.",
+            "Anonymous sign-in is disabled to preserve zero-trust security across SAT Limited."
+        )
+    ),
+    ManualSection(
+        id = "contacts_and_availability",
+        category = "Contacts & Availability",
+        title = "Contacts Sync & Real-Time Availability",
+        icon = Icons.Default.People,
+        badge = "Live Sync",
+        summary = "View all Firestore-synced friends and colleagues with real-time online status and availability badges.",
+        steps = listOf(
+            "Tap the 'Contacts' tab on the bottom navigation bar to open your live contact directory.",
+            "Set your own real-time availability at the top ('Available', 'Busy', 'Away', 'In a Meeting', or 'Do Not Disturb') — changes sync instantly to other users.",
+            "Filter contacts by All, Online, Friends, or Colleagues, or search by name, @handle, email, phone, or availability.",
+            "Tap the Star icon next to any contact to add or remove them from your personal Friends list.",
+            "Tap any contact row to inspect their live availability, Last Seen timestamp, email, or phone number, or tap Message to open a chat."
+        ),
+        tips = listOf(
+            "Green = Available, Blue = In a Meeting, Amber = Away, Red = Busy / Do Not Disturb, Gray = Offline with relative Last Seen time."
         )
     ),
     ManualSection(
         id = "direct_chats",
         category = "Direct Chats",
-        title = "1-on-1 Colleague Messaging",
+        title = "1-on-1 Messaging & Emoji Reactions",
         icon = Icons.Default.Person,
         badge = "Direct",
-        summary = "Communicate privately in real time with colleagues across SAT departments.",
+        summary = "Communicate privately in real time with colleagues and friends using replies and emoji reactions.",
         steps = listOf(
-            "Tap the '+' (New Message) floating button on the bottom right.",
-            "Browse or search the registered employee directory under the 'Direct Message' tab.",
-            "Tap on a colleague's name to open your private direct channel.",
-            "Type your message into the input field and tap the Send button.",
-            "Long-press any message bubble to react with emojis (👍, ❤️, 😂, 😮, 😢, 🙏, 🔥, 🎉, 👏, 🚀) or tap '+' for extended emojis.",
-            "Long-press any message bubble to Reply with a quote, Copy the text, or Delete for everyone."
+            "Tap the '+' (New Message) floating button or pick someone from the Contacts tab to start a 1-on-1 chat.",
+            "Chats display each contact's real name or @username handle rather than generic placeholders.",
+            "Long-press any message bubble to add an emoji reaction (👍, ❤️, 😂, 😮, 😢, 🙏, 🔥, 🎉, 👏, 🚀) or tap '+' for the extended emoji grid.",
+            "Long-press a message to Reply with a quoted snippet, Copy text, or Delete for everyone."
         ),
         tips = listOf(
-            "Tap any reaction chip on a message to quickly toggle your reaction or view who reacted.",
-            "Use the top colleague carousel inside the chat to switch conversations with one tap.",
-            "Tap the paperclip icon to send project photos or official SAT documents."
+            "Tap any reaction pill under a message to toggle your own reaction or view everyone who reacted.",
+            "Use the top carousel inside a conversation to switch quickly between contacts."
+        )
+    ),
+    ManualSection(
+        id = "voice_messaging",
+        category = "Voice Clips",
+        title = "Voice Recording & In-Chat Audio Playback",
+        icon = Icons.Default.Mic,
+        badge = "Audio",
+        summary = "Record voice notes directly inside any chat using the device microphone and play them back inline.",
+        steps = listOf(
+            "When the message box is empty, tap the Microphone icon on the right (or choose 'Record Voice Clip' from the paperclip menu).",
+            "Grant the Microphone permission when prompted so SAT Messenger can capture audio.",
+            "Watch the live elapsed timer and amplitude bars while recording (up to 90 seconds).",
+            "Tap Stop to listen to a preview before sending, Discard to cancel, or Send immediately.",
+            "Tap Play/Pause inside any voice message bubble and drag the slider to scrub through the clip."
+        ),
+        tips = listOf(
+            "Typing text in the composer automatically switches the Microphone button into the Send button."
         )
     ),
     ManualSection(
         id = "group_rooms",
         category = "Group Rooms",
-        title = "Group Chat Rooms (`chatRooms`)",
+        title = "Group Chat Rooms",
         icon = Icons.Default.Group,
         badge = "Collaborative",
-        summary = "Create and manage departmental chat rooms with multiple participants using 'memberIds'.",
+        summary = "Create and manage departmental group rooms with shared participant lists and invite links.",
         steps = listOf(
-            "Tap the '+' button and select the 'New Group' tab.",
-            "Enter a descriptive room name (e.g., 'SAT Operations', 'Payload Engineering').",
-            "Optionally add a room charter / topic to clarify the room's objective.",
-            "Select colleagues by checking the box next to their names in the directory.",
-            "Tap 'Create Group' — your group room is saved to the Firestore 'chatRooms' collection with all selected memberIds.",
-            "Inside the room, tap the 'Participants' button in the top bar to inspect all active members and their online status."
+            "Tap the '+' button on the Chats screen and switch to the 'New Group' tab.",
+            "Enter a room name, optional charter/description, and select colleagues or friends to invite.",
+            "Tap 'Create Group' to launch the room in Cloud Firestore.",
+            "Tap the room header or Participants icon inside the chat to view all members and their live availability."
         ),
         tips = listOf(
-            "Every incoming group message displays the sender's name in Cyber Teal for effortless identification.",
-            "Room administrators can manage discussions, and all members receive real-time notifications."
+            "Incoming group messages show the sender's name and handle above each bubble for clarity."
+        )
+    ),
+    ManualSection(
+        id = "invite_links",
+        category = "Invite Links",
+        title = "Channel, Group & Community Invite Links",
+        icon = Icons.Default.Link,
+        badge = "Shareable",
+        summary = "Generate, share, revoke, and redeem invite links for Group Rooms, Channels, and Communities.",
+        steps = listOf(
+            "Open any Group Room, Channel, or Community and tap its Share Invite Link action.",
+            "Copy the invite code or share URL (e.g. satmessenger.app/invite/...) directly to colleagues.",
+            "Admins can tap 'Reset Link' at any time to revoke the old code and issue a fresh one.",
+            "To join via a link, tap the Link icon in the Chats top bar, paste the code or URL, preview the destination, and tap Join."
+        ),
+        tips = listOf(
+            "Deep links (satmessenger://invite/...) automatically open the Join Invite dialog once signed in."
+        )
+    ),
+    ManualSection(
+        id = "broadcast_channels",
+        category = "Channels",
+        title = "Flexible Broadcast Channels",
+        icon = Icons.Default.Campaign,
+        badge = "Flexible",
+        summary = "Create public or invite-only channels with customizable posting and reaction permissions.",
+        steps = listOf(
+            "Open the 'Updates' tab and select 'Channels'.",
+            "Tap the megaphone FAB to create a channel with a custom Category (e.g. Engineering, Operations, Alerts).",
+            "Configure flexibility toggles: Public vs Private (invite-only), Allow Follower Posts, and Allow Reactions.",
+            "Channel admins can update channel settings or delete the channel anytime from the channel header."
+        ),
+        tips = listOf(
+            "Follower counts and broadcast posts sync live across the organization in Cloud Firestore."
+        )
+    ),
+    ManualSection(
+        id = "whatsapp_communities",
+        category = "Communities",
+        title = "Communities & Subgroup Hubs",
+        icon = Icons.Default.Groups,
+        badge = "Enterprise",
+        summary = "Organize related group rooms and announcement hubs under one umbrella community.",
+        steps = listOf(
+            "Tap the 'Communities' tab on the bottom navigation bar.",
+            "Tap 'Start a Community' to create a division hub with subgroup rooms.",
+            "Share a Community invite link so members can discover and join linked subgroups."
+        ),
+        tips = listOf(
+            "Every community features an '📢 Announcements' room for team-wide notices."
+        )
+    ),
+    ManualSection(
+        id = "whatsapp_status",
+        category = "Status & Updates",
+        title = "24-Hour Status Updates",
+        icon = Icons.Default.DonutLarge,
+        badge = "Stories",
+        summary = "Share text or photo status updates that automatically expire after 24 hours.",
+        steps = listOf(
+            "Open the 'Updates' tab and stay on 'Status'.",
+            "Tap '+' under My Status to pick a background color, write a thought, or attach media.",
+            "Contacts with active statuses show a green ring around their avatar in Chats."
+        ),
+        tips = listOf(
+            "Reply directly to any contact's status from the story viewer reply bar."
+        )
+    ),
+    ManualSection(
+        id = "media_sharing",
+        category = "Media & Files",
+        title = "Photos, Media & Document Sharing",
+        icon = Icons.Default.AttachFile,
+        badge = "Zero-Permission",
+        summary = "Share photos and files securely using Android's zero-permission Photo Picker.",
+        steps = listOf(
+            "Tap the paperclip icon on the left side of any chat composer.",
+            "Select 'Photo & Media' or 'Document & Files', review the preview, add an optional caption, and tap Send.",
+            "Tap any image bubble in a chat to open the full-screen viewer, or view all media in Contact / Group Info."
+        ),
+        tips = listOf(
+            "Photos are compressed automatically for fast, reliable delivery."
         )
     ),
     ManualSection(
@@ -157,34 +271,74 @@ private val MANUAL_SECTIONS = listOf(
         title = "Live Presence & Typing Indicators",
         icon = Icons.Default.Sync,
         badge = "Instant",
-        summary = "Real-time presence tracking and typing status powered by Firestore snapshot streams.",
+        summary = "Real-time active indicators and animated typing bubbles powered by Firestore listeners.",
         steps = listOf(
-            "Look for the green dot next to colleague avatars indicating they are 'Active Now'.",
-            "When a colleague begins composing in the input field, the 'isTyping' field updates in the chat document.",
-            "A typing subtitle (e.g. 'Alice is typing...') appears in the top bar.",
-            "A typing card featuring 3 animated bouncing dots displays at the bottom of the conversation.",
-            "Typing status automatically clears after 2.5 seconds of inactivity or when the message is sent."
+            "Presence automatically syncs when you open, background, or change availability in SAT Messenger.",
+            "When someone types in a chat, the header displays who is typing alongside an animated 3-dot bubble."
         ),
         tips = listOf(
-            "In group chat rooms, multiple typing colleagues are reported (e.g. 'Alice and Bob are typing...')."
+            "Group rooms display multiple concurrent typers cleanly in the subtitle."
         )
     ),
     ManualSection(
         id = "read_receipts",
         category = "Real-Time & Receipts",
-        title = "Read Receipts & 'readBy' Map",
+        title = "Read Receipts & Seen Tracking",
         icon = Icons.Default.DoneAll,
         badge = "Verified",
-        summary = "Track exactly who has received and viewed your messages in both 1-on-1 and group rooms.",
+        summary = "Track sent, delivered, and read status ticks across direct and group conversations.",
         steps = listOf(
-            "Single Check: The message has been sent to Cloud Firestore.",
-            "Double Check (White): The message has been delivered to members.",
-            "Double Check (Cyber Teal): The message has been read by participants.",
-            "When viewing a chat, opening the conversation automatically marks incoming messages as read by updating your entry in the 'readBy' map.",
-            "Long-press your message to view the exact read receipt summary (e.g. 'Seen by 3 colleagues')."
+            "Single check = sent to Firestore; double check = delivered; teal double check = read.",
+            "Long-press your outgoing message to see how many participants have read it."
         ),
         tips = listOf(
-            "You can disable sending read receipts in your Profile > Privacy Settings if you prefer silent viewing."
+            "Disable Read Receipts anytime in Profile > Privacy Controls."
+        )
+    ),
+    ManualSection(
+        id = "system_notifications",
+        category = "Notifications & Badges",
+        title = "Phone Notification Center & Alerts",
+        icon = Icons.Default.NotificationsActive,
+        badge = "Alerts",
+        summary = "Receive incoming message alerts in your phone's Notification Center alongside unread badges.",
+        steps = listOf(
+            "Allow notification permission when prompted (or enable it from the Chats banner or Profile > Notification Center).",
+            "Incoming messages post to your phone Notification Center when the chat isn't open, and tapping a notification opens that conversation directly.",
+            "Use 'Send Test Notification' in Profile to verify Notification Center delivery, or toggle system notifications on/off anytime."
+        ),
+        tips = listOf(
+            "Unread counts appear on each chat row and as a green badge on the Chats navigation tab."
+        )
+    ),
+    ManualSection(
+        id = "search_and_contact_details",
+        category = "Search & Details",
+        title = "Global Search & Contact Info",
+        icon = Icons.Default.Phone,
+        badge = "Directory",
+        summary = "Find people by name, @username, email, or phone number and inspect rich Contact Info.",
+        steps = listOf(
+            "Tap the person-search icon in the Chats top bar for quick global lookup, or use the Contacts tab.",
+            "Inside any chat, tap the top bar title to open Contact / Group Info with copyable email/phone, shared media, and chat management."
+        ),
+        tips = listOf(
+            "Keep your phone number updated in Profile > Profile Details so contacts can reach you quickly."
+        )
+    ),
+    ManualSection(
+        id = "chat_management_and_badges",
+        category = "Chat Management",
+        title = "Clearing History & Deleting Chats",
+        icon = Icons.Default.DeleteSweep,
+        badge = "Controls",
+        summary = "Long-press conversations to clear message history or delete chats cleanly.",
+        steps = listOf(
+            "Long-press any chat card in the Chats tab (or open the ⋮ menu inside a chat) to Clear Chat History or Delete Chat.",
+            "Confirmation dialogs protect against accidental deletion."
+        ),
+        tips = listOf(
+            "Clearing history removes messages while keeping the conversation thread active."
         )
     ),
     ManualSection(
@@ -193,127 +347,14 @@ private val MANUAL_SECTIONS = listOf(
         title = "Privacy, Blocking & Compliance",
         icon = Icons.Default.Security,
         badge = "Compliance",
-        summary = "Manage corporate compliance, contact blocking, and visibility controls.",
+        summary = "Control Read Receipts, Last Seen presence, blocked contacts, compliance reports, and account deletion.",
         steps = listOf(
-            "Privacy Toggles: Go to Profile to toggle 'Read Receipts' and 'Last Seen' presence.",
-            "Blocking Contacts: Inside any 1-on-1 chat, tap the top menu (⋮) and select 'Block Contact'. Blocked users cannot message you.",
-            "Unblocking Contacts: Navigate to Profile > Blocked Contacts to review and unblock colleagues.",
-            "Reporting Incidents: Tap 'Report to SAT Compliance' in the chat menu to submit an official violation report.",
-            "Account Deletion: Permanent account deletion is available at the bottom of the Profile page."
+            "Go to Profile > Privacy Controls to toggle Read Receipts and Online & Last Seen Presence.",
+            "Inside a 1-on-1 chat menu (⋮), tap Block Contact or Report to SAT Compliance.",
+            "Manage blocked users or permanently delete your account from the Profile screen."
         ),
         tips = listOf(
-            "All compliance reports are stored in a restricted, auditable Firestore collection for the SAT Security Operations team."
-        )
-    ),
-    ManualSection(
-        id = "whatsapp_status",
-        category = "Status & Updates",
-        title = "Status Updates (24-Hour Stories)",
-        icon = Icons.Default.DonutLarge,
-        badge = "New",
-        summary = "Share text thoughts, announcements, and photos that automatically expire after 24 hours.",
-        steps = listOf(
-            "Navigate to the 'Updates' bottom navigation tab.",
-            "Under 'My Status', tap the '+' or the camera/pencil floating action button.",
-            "Compose your update, choose a vibrant background color gradient, and optionally add a media URL.",
-            "Tap 'Share to My Status' — your status is broadcast to SAT colleagues for 24 hours.",
-            "Tap your status to view who has seen it, or tap a colleague's status ring to watch their full-screen interactive story."
-        ),
-        tips = listOf(
-            "Contacts with active statuses display a green status ring around their avatar in the conversation list.",
-            "You can reply directly to any colleague's status from the bottom reply bar in the story viewer."
-        )
-    ),
-    ManualSection(
-        id = "broadcast_channels",
-        category = "Channels",
-        title = "Broadcast Channels",
-        icon = Icons.Default.Campaign,
-        badge = "Broadcast",
-        summary = "Follow one-way company announcements, mission telemetry alerts, and departmental news.",
-        steps = listOf(
-            "Go to 'Updates' tab and tap 'Channels'.",
-            "Browse public SAT channels or tap the megaphone FAB to create your own.",
-            "Tap 'Follow' on any channel to subscribe to corporate announcements.",
-            "Tap on a channel card to view its broadcast feed and react with emoji pills (👍, ❤️, 🚀, 👏).",
-            "Channel administrators can post announcements with text and images directly from the bottom composer."
-        ),
-        tips = listOf(
-            "Follower counts are updated live across the organization in Firestore."
-        )
-    ),
-    ManualSection(
-        id = "whatsapp_communities",
-        category = "Communities",
-        title = "Community Chats & Subgroups",
-        icon = Icons.Default.Groups,
-        badge = "Enterprise",
-        summary = "Group related chat rooms and teams under an umbrella community hub like WhatsApp.",
-        steps = listOf(
-            "Tap the 'Communities' tab on the bottom navigation bar.",
-            "Tap 'Start a Community' or the community FAB.",
-            "Name the community (e.g. 'Flight Software Division'), add a description, and specify subgroup chat rooms.",
-            "Every community automatically features an '📢 Announcements' room for broadcast notices.",
-            "Tap on any subgroup room card inside a community to jump right into discussion."
-        ),
-        tips = listOf(
-            "Communities help large teams avoid chat clutter by categorizing related topics together."
-        )
-    ),
-    ManualSection(
-        id = "search_and_contact_details",
-        category = "Search & Details",
-        title = "User Details & Phone/Email Search",
-        icon = Icons.Default.Phone,
-        badge = "Directory",
-        summary = "Search colleagues by name, email, or phone number, and view rich WhatsApp-style contact details.",
-        steps = listOf(
-            "Tap the Search tab on the bottom bar or the search icon in the top bar.",
-            "Type a user's display name, company email, or phone number (e.g. '+1 555').",
-            "Results display matching indicators highlighting whether name, email, or phone matched.",
-            "Inside any chat, tap the top bar user name or group title to open full Contact / Group Details.",
-            "Contact Info reveals phone number (tap to copy), email, status, quick Audio/Video call affordances, shared media, and security encryption status."
-        ),
-        tips = listOf(
-            "Update your phone number anytime under Profile > Profile Details so colleagues can easily find and call you."
-        )
-    ),
-    ManualSection(
-        id = "media_sharing",
-        category = "Media & Files",
-        title = "Sending Photos & Media Files",
-        icon = Icons.Default.AttachFile,
-        badge = "Zero-Permission",
-        summary = "Share photos, images, and documents with instant preview, caption editing, and full-screen viewing.",
-        steps = listOf(
-            "Tap the paperclip attachment icon on the left of the message composer in any chat.",
-            "Select 'Photo & Media' to open Android's secure zero-permission Photo Picker, or 'Document & Files' for other files.",
-            "In the preview sheet, review the thumbnail or document card, file name, and size.",
-            "Optionally add a message caption in the text input field.",
-            "Tap 'Send' to compress and deliver the media securely to chat participants.",
-            "Tap any shared image in the conversation thread to launch the full-screen photo viewer."
-        ),
-        tips = listOf(
-            "Images are automatically optimized and compressed to ensure instant delivery even on low bandwidth connections."
-        )
-    ),
-    ManualSection(
-        id = "chat_management_and_badges",
-        category = "Chat Management",
-        title = "Deleting Chats, Clearing History & Unread Notifications",
-        icon = Icons.Default.DeleteSweep,
-        badge = "Badges & Alerts",
-        summary = "Delete conversations, clear message logs, and stay updated with real-time unread badges and banners.",
-        steps = listOf(
-            "Long press on any chat item in the main Chats list to open the quick action dialog.",
-            "Tap 'Clear Chat History' to remove all messages while keeping the conversation room open.",
-            "Tap 'Delete Chat' to permanently remove the conversation and its message records.",
-            "Alternatively, tap the 3-dots menu inside any chat or tap Contact Details to find 'Clear Chat' and 'Delete Conversation'.",
-            "Unread message counts appear as green badge pills on conversation cards and on the bottom 'Chats' tab icon.",
-            "When new messages arrive from other chats while using the app, an in-app alert banner appears at the top for instant switching."
-        ),
-        tips = listOf(
-            "All clearing and deletion actions require explicit confirmation to protect important communications from accidental deletion."
+            "Compliance reports are logged securely to a restricted Firestore collection."
         )
     )
 )
@@ -328,7 +369,24 @@ fun AppManualScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
-    val categories = listOf("All", "Getting Started", "Direct Chats", "Group Rooms", "Media & Files", "Chat Management", "Status & Updates", "Channels", "Communities", "Search & Details", "Real-Time & Receipts", "Privacy & Safety")
+    val categories = listOf(
+        "All",
+        "Getting Started",
+        "Contacts & Availability",
+        "Direct Chats",
+        "Voice Clips",
+        "Group Rooms",
+        "Invite Links",
+        "Channels",
+        "Communities",
+        "Status & Updates",
+        "Media & Files",
+        "Notifications & Badges",
+        "Search & Details",
+        "Chat Management",
+        "Real-Time & Receipts",
+        "Privacy & Safety"
+    )
 
     val filteredSections = remember(searchQuery, selectedCategory) {
         MANUAL_SECTIONS.filter { section ->
@@ -427,7 +485,7 @@ fun AppManualScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Everything you need to know about 1-on-1 direct messaging, group chat rooms, real-time typing indicators, read receipts, and corporate compliance.",
+                            text = "Everything you need to know about Google & Microsoft sign-in, live contact availability, direct & group chats, voice clips, invite links, flexible channels, phone notifications, and privacy.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.8f)
                         )

@@ -147,4 +147,45 @@ class SignInScreenAndAuthTest {
         )
         assertNull(cancelledResult)
     }
+
+    @Test
+    fun signInScreen_rendersManualButton_andInvokesCallbackOrEmbeddedManual() {
+        var openManualClicks = 0
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                SignInScreen(
+                    authState = AuthUiState.Unauthenticated,
+                    onGoogleSignInClick = {},
+                    onMicrosoftSignInClick = {},
+                    onOpenManual = { openManualClicks++ }
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("registration_manual_button").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, openManualClicks)
+    }
+
+    @Test
+    fun signInScreen_opensEmbeddedManualCopyWhenCallbackIsNull() {
+        composeRule.setContent {
+            SATMessengerTheme {
+                SignInScreen(
+                    authState = AuthUiState.Unauthenticated,
+                    onGoogleSignInClick = {},
+                    onMicrosoftSignInClick = {}
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("registration_manual_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("SAT Messenger Manual").assertIsDisplayed()
+        composeRule.onNodeWithText("Registration & Sign-In (Google & Microsoft)").assertIsDisplayed()
+    }
 }

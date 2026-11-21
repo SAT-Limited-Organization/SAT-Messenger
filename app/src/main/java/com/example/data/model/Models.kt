@@ -5,6 +5,22 @@ import com.google.firebase.firestore.IgnoreExtraProperties
 import com.google.firebase.firestore.PropertyName
 import com.google.firebase.firestore.ServerTimestamp
 
+enum class AvailabilityStatus(val label: String) {
+    AVAILABLE("Available"),
+    BUSY("Busy"),
+    AWAY("Away"),
+    IN_MEETING("In a Meeting"),
+    DO_NOT_DISTURB("Do Not Disturb"),
+    OFFLINE("Offline");
+
+    companion object {
+        fun fromLabel(raw: String?, isOnline: Boolean): AvailabilityStatus {
+            if (!isOnline) return OFFLINE
+            return entries.firstOrNull { it.label.equals(raw?.trim(), ignoreCase = true) } ?: AVAILABLE
+        }
+    }
+}
+
 @IgnoreExtraProperties
 data class UserProfile(
     val userId: String = "",
@@ -13,6 +29,9 @@ data class UserProfile(
     val phoneNumber: String? = null,
     val avatarUrl: String? = null,
     val statusMessage: String? = "Available",
+    val availabilityStatus: String = AvailabilityStatus.AVAILABLE.label,
+    @get:PropertyName("isOnline")
+    @field:PropertyName("isOnline")
     val isOnline: Boolean = false,
     @ServerTimestamp val lastSeen: Timestamp? = null,
     @ServerTimestamp val createdAt: Timestamp? = null,
@@ -32,7 +51,20 @@ data class UserProfile(
             userId.isNotBlank() -> "@user_${userId.take(6)}"
             else -> "@user"
         }
+
+    fun resolvedAvailability(): AvailabilityStatus {
+        return AvailabilityStatus.fromLabel(availabilityStatus, isOnline)
+    }
 }
+
+@IgnoreExtraProperties
+data class ContactEntry(
+    val contactUserId: String = "",
+    val relationship: String = "friend", // "friend" or "colleague"
+    val nickname: String? = null,
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
 
 @IgnoreExtraProperties
 data class PrivacySettings(

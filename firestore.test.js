@@ -342,3 +342,52 @@ test("Voice messages: chat member can send audio clip with durationSeconds, non-
     })
   );
 });
+
+test("Contacts & Availability: user can sync valid availabilityStatus and manage friends, cross-user denied", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const pastDate = new Date(Date.now() - 1000);
+
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      displayName: "Alice Smith",
+      email: "alice@satlimited.com",
+      availabilityStatus: "In a Meeting",
+      isOnline: true,
+      lastSeen: pastDate,
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    })
+  );
+
+  // Invalid availabilityStatus is rejected
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      availabilityStatus: "On Mars",
+    })
+  );
+
+  // Alice can bookmark Bob as a friend in her contacts subcollection
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("contacts").doc(BOB_UID).set({
+      contactUserId: BOB_UID,
+      relationship: "friend",
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    })
+  );
+
+  // Bob cannot read or modify Alice's saved contacts subcollection
+  await assertFails(
+    bobDb.collection("users").doc(ALICE_UID).collection("contacts").doc(BOB_UID).get()
+  );
+  await assertFails(
+    bobDb.collection("users").doc(ALICE_UID).collection("contacts").doc(CHARLIE_UID).set({
+      contactUserId: CHARLIE_UID,
+      relationship: "friend",
+      createdAt: pastDate,
+    })
+  );
+});
+

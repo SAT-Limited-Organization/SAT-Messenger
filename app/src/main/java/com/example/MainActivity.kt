@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                 val chats by viewModel.chats.collectAsState()
                 val messages by viewModel.messages.collectAsState()
                 val directoryUsers by viewModel.directoryUsers.collectAsState()
+                val savedContacts by viewModel.savedContacts.collectAsState()
                 val blockedUsers by viewModel.blockedUsers.collectAsState()
                 val privacySettings by viewModel.privacySettings.collectAsState()
                 val replyingTo by viewModel.replyingTo.collectAsState()
@@ -151,6 +152,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 var notificationBannerDismissed by remember { mutableStateOf(false) }
+                var showPreAuthManual by remember { mutableStateOf(false) }
 
                 val openAppNotificationSettings: () -> Unit = {
                     val settingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
@@ -213,13 +215,15 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(authState) {
-                    if (authState is AuthUiState.Authenticated &&
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        !hasNotificationPermission &&
-                        !notificationPrefs.getBoolean("asked_post_notifications", false)
-                    ) {
-                        notificationPrefs.edit().putBoolean("asked_post_notifications", true).apply()
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    if (authState is AuthUiState.Authenticated) {
+                        showPreAuthManual = false
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            !hasNotificationPermission &&
+                            !notificationPrefs.getBoolean("asked_post_notifications", false)
+                        ) {
+                            notificationPrefs.edit().putBoolean("asked_post_notifications", true).apply()
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
                     }
                 }
 
@@ -265,6 +269,7 @@ class MainActivity : ComponentActivity() {
                                         userProfile = userProfile,
                                         chats = chats,
                                         directoryUsers = directoryUsers,
+                                        savedContacts = savedContacts,
                                         statuses = statuses,
                                         channels = channels,
                                         communities = communities,
@@ -338,6 +343,12 @@ class MainActivity : ComponentActivity() {
                                         onDirectMessageUser = { targetUser ->
                                             viewModel.openDirectChatWithUser(targetUser)
                                         },
+                                        onUpdateAvailability = { status ->
+                                            viewModel.updateAvailabilityStatus(status)
+                                        },
+                                        onToggleFriendContact = { targetUser ->
+                                            viewModel.toggleFriendContact(targetUser)
+                                        },
                                         showNotificationPermissionBanner = !hasNotificationPermission && !notificationBannerDismissed,
                                         onEnableNotificationsClick = requestNotificationPermission,
                                         onDismissNotificationBanner = { notificationBannerDismissed = true }
@@ -403,6 +414,9 @@ class MainActivity : ComponentActivity() {
                                         onBack = { viewModel.navigateTo(ScreenState.CHATS) },
                                         onUpdateProfile = { name, status, phone ->
                                             viewModel.updateProfile(name, status, phone)
+                                        },
+                                        onUpdateAvailability = { status ->
+                                            viewModel.updateAvailabilityStatus(status)
                                         },
                                         onUpdatePrivacy = { readReceipts, lastSeenVisible ->
                                             viewModel.updatePrivacy(readReceipts, lastSeenVisible)
@@ -605,19 +619,28 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 } else {
-                    SignInScreen(
-                        authState = authState,
-                        activeProvider = activeAuthProvider,
-                        onGoogleSignInClick = { activity ->
-                            viewModel.signInWithGoogle(activity)
-                        },
-                        onMicrosoftSignInClick = { activity ->
-                            viewModel.signInWithMicrosoft(activity)
-                        },
-                        onDismissError = {
-                            viewModel.clearAuthError()
-                        }
-                    )
+                    if (showPreAuthManual) {
+                        AppManualScreen(
+                            onBack = { showPreAuthManual = false }
+                        )
+                    } else {
+                        SignInScreen(
+                            authState = authState,
+                            activeProvider = activeAuthProvider,
+                            onGoogleSignInClick = { activity ->
+                                viewModel.signInWithGoogle(activity)
+                            },
+                            onMicrosoftSignInClick = { activity ->
+                                viewModel.signInWithMicrosoft(activity)
+                            },
+                            onDismissError = {
+                                viewModel.clearAuthError()
+                            },
+                            onOpenManual = {
+                                showPreAuthManual = true
+                            }
+                        )
+                    }
                 }
             }
         }

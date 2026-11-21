@@ -32,8 +32,16 @@ service cloud.firestore {
              (!('phoneNumber' in data) || data.phoneNumber == null || (data.phoneNumber is string && data.phoneNumber.size() <= 30)) &&
              (!('avatarUrl' in data) || data.avatarUrl == null || (data.avatarUrl is string && data.avatarUrl.size() <= 500000)) &&
              (!('statusMessage' in data) || data.statusMessage == null || (data.statusMessage is string && data.statusMessage.size() <= 200)) &&
+             (!('availabilityStatus' in data) || data.availabilityStatus == null || data.availabilityStatus in ['Available', 'Busy', 'Away', 'In a Meeting', 'Do Not Disturb', 'Offline']) &&
              (!('isOnline' in data) || data.isOnline is bool) &&
              (!('lastSeen' in data) || data.lastSeen == null || data.lastSeen is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt == null || data.updatedAt is timestamp);
+    }
+
+    function isValidContactEntry(data) {
+      return data.contactUserId is string && data.contactUserId.size() > 0 && data.contactUserId.size() <= 128 &&
+             data.relationship in ['friend', 'colleague'] &&
+             (!('nickname' in data) || data.nickname == null || (data.nickname is string && data.nickname.size() <= 80)) &&
              (!('updatedAt' in data) || data.updatedAt == null || data.updatedAt is timestamp);
     }
 
@@ -207,6 +215,35 @@ service cloud.firestore {
         allow read, write: if isSignedIn() &&
                               isValidId(userId) &&
                               request.auth.uid == userId;
+      }
+
+      // Contacts (friends / starred colleagues) subcollection
+      match /contacts/{contactId} {
+        allow get, list: if isSignedIn() &&
+                              isValidId(userId) &&
+                              request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(contactId) &&
+                         request.auth.uid == userId &&
+                         incoming().contactUserId == contactId &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidContactEntry(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(contactId) &&
+                         request.auth.uid == userId &&
+                         incoming().contactUserId == existing().contactUserId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidContactEntry(incoming());
+
+        allow delete: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(contactId) &&
+                         request.auth.uid == userId;
       }
     }
 

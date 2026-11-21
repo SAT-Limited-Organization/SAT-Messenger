@@ -134,6 +134,7 @@ import com.example.audio.RecordedAudioClip
 import com.example.audio.VoicePlayerManager
 import com.example.audio.VoiceRecorderManager
 import com.example.audio.formatAudioDuration
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.Chat
 import com.example.data.model.Message
 import com.example.data.model.UserProfile
@@ -143,6 +144,7 @@ import com.example.ui.components.MessageStatusIndicator
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.VoicePreviewComposerBar
 import com.example.ui.components.VoiceRecordingComposerBar
+import com.example.ui.components.availabilityColor
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatIncomingBubbleDark
 import com.example.ui.theme.SatIncomingBubbleLight
@@ -491,12 +493,14 @@ fun ChatScreen(
     val otherUsernameHandle = otherUser?.email?.substringBefore("@")?.takeIf { it.isNotBlank() }?.let { "@$it" }
         ?: otherUserId?.let { "@user_${it.take(6)}" }
 
+    val otherAvailability = otherUser?.resolvedAvailability() ?: AvailabilityStatus.OFFLINE
+
     val statusSubtitle = if (isGroup) {
         "${chat.memberIds.size} registered members"
     } else {
         val handlePrefix = if (otherUsernameHandle != null) "$otherUsernameHandle • " else ""
-        if (isOnline) {
-            "${handlePrefix}Active Now"
+        if (otherAvailability != AvailabilityStatus.OFFLINE) {
+            "${handlePrefix}${otherAvailability.label}"
         } else {
             val lastSeenDate = otherUser?.lastSeen?.toDate()
             if (lastSeenDate != null) "${handlePrefix}Last seen ${formatMessageTime(lastSeenDate)}" else "${handlePrefix}Offline"
@@ -535,6 +539,7 @@ fun ChatScreen(
                                 name = title,
                                 avatarUrl = otherUser?.avatarUrl,
                                 isOnline = isOnline,
+                                availabilityStatus = if (isGroup) null else otherAvailability,
                                 isGroup = isGroup,
                                 size = 40.dp
                             )
@@ -555,11 +560,11 @@ fun ChatScreen(
                                                 .background(SatElectricBlue, CircleShape)
                                         )
                                         Spacer(modifier = Modifier.width(5.dp))
-                                    } else if (isOnline && !isGroup) {
+                                    } else if (!isGroup && otherAvailability != AvailabilityStatus.OFFLINE) {
                                         Box(
                                             modifier = Modifier
                                                 .size(7.dp)
-                                                .background(SatOnlineGreen, CircleShape)
+                                                .background(availabilityColor(otherAvailability), CircleShape)
                                         )
                                         Spacer(modifier = Modifier.width(5.dp))
                                     }
@@ -567,7 +572,7 @@ fun ChatScreen(
                                         text = if (isSomeoneTyping) typingStatusText else statusSubtitle,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = if (isSomeoneTyping) FontWeight.SemiBold else FontWeight.Normal,
-                                        color = if (isSomeoneTyping) SatElectricBlue else if (isOnline) SatTeal else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isSomeoneTyping) SatElectricBlue else if (!isGroup && otherAvailability != AvailabilityStatus.OFFLINE) availabilityColor(otherAvailability) else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }

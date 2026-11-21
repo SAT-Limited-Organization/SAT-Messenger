@@ -2,15 +2,19 @@ package com.example.data.repository
 
 import android.content.Context
 import com.example.R
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.BlockedUser
+import com.example.data.model.ContactEntry
 import com.example.data.model.PrivacySettings
 import com.example.data.model.Report
 import com.example.data.model.UserProfile
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.snapshots
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -32,17 +36,73 @@ class UserRepository(private val db: FirebaseFirestore) {
             ?: throw IllegalStateException("User must be authenticated before performing user actions.")
     }
 
+    suspend fun ensureProfileSynced(profile: UserProfile): Result<Unit> {
+        val uid = requireUserId()
+        val path = "users/$uid"
+        val userDoc = db.collection("users").document(uid)
+        return try {
+            val existingSnapshot = userDoc.get().await()
+            if (!existingSnapshot.exists()) {
+                val safeName = profile.displayName.trim()
+                    .ifBlank { profile.email.substringBefore("@").ifBlank { "SAT Member" } }
+                    .take(100)
+                val payload = mutableMapOf<String, Any>(
+                    "userId" to uid,
+                    "displayName" to safeName,
+                    "email" to profile.email,
+                    "availabilityStatus" to profile.availabilityStatus,
+                    "isOnline" to true,
+                    "lastSeen" to FieldValue.serverTimestamp(),
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+                profile.phoneNumber?.let { payload["phoneNumber"] = it }
+                profile.avatarUrl?.let { payload["avatarUrl"] = it }
+                profile.statusMessage?.let { payload["statusMessage"] = it }
+                userDoc.set(payload).await()
+            } else {
+                val existingStatus = existingSnapshot.getString("availabilityStatus")
+                val nextStatus = if (existingStatus == AvailabilityStatus.OFFLINE.label || existingStatus.isNullOrBlank()) {
+                    AvailabilityStatus.AVAILABLE.label
+                } else {
+                    existingStatus
+                }
+                val updates = mutableMapOf<String, Any>(
+                    "isOnline" to true,
+                    "availabilityStatus" to nextStatus,
+                    "lastSeen" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+                if (existingSnapshot.getString("avatarUrl").isNullOrBlank() && !profile.avatarUrl.isNullOrBlank()) {
+                    updates["avatarUrl"] = profile.avatarUrl
+                }
+                userDoc.update(updates).await()
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, path)
+            Result.failure(e)
+        }
+    }
+
     suspend fun saveProfile(profile: UserProfile): Result<Unit> {
         val uid = requireUserId()
         val path = "users/$uid"
         val userDoc = db.collection("users").document(uid)
         return try {
             val existingSnapshot = userDoc.get().await()
+            val safeName = profile.displayName.trim()
+                .ifBlank { profile.email.substringBefore("@").ifBlank { "SAT Member" } }
+                .take(100)
             val payload = mutableMapOf<String, Any>(
                 "userId" to uid,
-                "displayName" to profile.displayName,
+                "displayName" to safeName,
                 "email" to profile.email,
+                "availabilityStatus" to profile.availabilityStatus,
                 "isOnline" to profile.isOnline,
+                "lastSeen" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             profile.phoneNumber?.let { payload["phoneNumber"] = it }
@@ -56,6 +116,8 @@ class UserRepository(private val db: FirebaseFirestore) {
                 userDoc.update(payload).await()
             }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.WRITE, path)
             Result.failure(e)
@@ -132,16 +194,102 @@ class UserRepository(private val db: FirebaseFirestore) {
         val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("No current user"))
         val path = "users/$uid"
         return try {
+            val payload = mutableMapOf<String, Any>(
+                "isOnline" to isOnline,
+                "lastSeen" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            db.collection("users").document(uid).update(payload).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateAvailabilityStatus(status: AvailabilityStatus): Result<Unit> {
+        val uid = requireUserId()
+        val path = "users/$uid"
+        return try {
             db.collection("users").document(uid).update(
                 mapOf(
-                    "isOnline" to isOnline,
+                    "availabilityStatus" to status.label,
+                    "isOnline" to (status != AvailabilityStatus.OFFLINE),
                     "lastSeen" to FieldValue.serverTimestamp(),
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    fun observeSavedContacts(userId: String): Flow<List<ContactEntry>> {
+        val path = "users/$userId/contacts"
+        return db.collection("users").document(userId)
+            .collection("contacts")
+            .snapshots()
+            .map { snapshot ->
+                snapshot.toObjects(ContactEntry::class.java)
+            }
+            .catch { error ->
+                if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
+                emit(emptyList())
+            }
+    }
+
+    suspend fun setContactRelationship(
+        targetUserId: String,
+        relationship: String = "friend",
+        nickname: String? = null
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val path = "users/$uid/contacts/$targetUserId"
+        val docRef = db.collection("users").document(uid)
+            .collection("contacts").document(targetUserId)
+        return try {
+            val existing = docRef.get().await()
+            val payload = mutableMapOf<String, Any>(
+                "contactUserId" to targetUserId,
+                "relationship" to relationship,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            nickname?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                payload["nickname"] = it.take(80)
+            }
+            if (!existing.exists()) {
+                payload["createdAt"] = FieldValue.serverTimestamp()
+                docRef.set(payload).await()
+            } else {
+                docRef.update(payload).await()
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeSavedContact(targetUserId: String): Result<Unit> {
+        val uid = requireUserId()
+        val path = "users/$uid/contacts/$targetUserId"
+        return try {
+            db.collection("users").document(uid)
+                .collection("contacts").document(targetUserId)
+                .delete().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, path)
             Result.failure(e)
         }
     }

@@ -14,4 +14,8 @@
     <string name="voice_record_hint">Recording voice note…</string>
     <string name="voice_permission_denied">Microphone permission is required to record voice clips.</string>
     <string name="voice_message_label">Voice message</string>
+    <string name="contacts_tab_label">Contacts</string>
+    <string name="contacts_title">Contacts &amp; Availability</string>
+    <string name="registration_manual_button">App Manual &amp; User Guide</string>
+    <string name="registration_manual_subtitle">Learn about sign-in, contacts, chats, voice clips &amp; privacy</string>
 </resources>

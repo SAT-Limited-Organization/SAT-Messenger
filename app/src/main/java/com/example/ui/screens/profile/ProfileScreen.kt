@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,6 +41,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,10 +69,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AvailabilityStatus
 import com.example.data.model.BlockedUser
 import com.example.data.model.PrivacySettings
 import com.example.data.model.UserProfile
+import com.example.ui.components.AvailabilityStatusPill
 import com.example.ui.components.UserAvatar
+import com.example.ui.components.availabilityColor
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatOnlineGreen
@@ -82,6 +89,7 @@ fun ProfileScreen(
     blockedUsers: List<BlockedUser>,
     onBack: () -> Unit,
     onUpdateProfile: (name: String, status: String, phoneNumber: String?) -> Unit,
+    onUpdateAvailability: (AvailabilityStatus) -> Unit = {},
     onUpdatePrivacy: (readReceipts: Boolean, lastSeenVisible: Boolean) -> Unit,
     onUnblockUser: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -159,7 +167,8 @@ fun ProfileScreen(
                     UserAvatar(
                         name = displayName.ifBlank { "User" },
                         avatarUrl = userProfile?.avatarUrl,
-                        isOnline = true,
+                        isOnline = userProfile?.isOnline ?: true,
+                        availabilityStatus = userProfile?.resolvedAvailability(),
                         size = 84.dp
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -184,9 +193,42 @@ fun ProfileScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val currentAvailability = userProfile?.resolvedAvailability() ?: AvailabilityStatus.AVAILABLE
+                    AvailabilityStatusPill(status = currentAvailability)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        items(AvailabilityStatus.entries) { statusOption ->
+                            val isSelected = statusOption == currentAvailability
+                            val dotColor = availabilityColor(statusOption)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { onUpdateAvailability(statusOption) },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(
+                                                if (isSelected) Color.White else dotColor,
+                                                CircleShape
+                                            )
+                                    )
+                                },
+                                label = { Text(statusOption.label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = dotColor,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("profile_availability_chip_${statusOption.name.lowercase()}")
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Profile Details Card
                 Card(
