@@ -1,6 +1,7 @@
 package com.example.ui.screens.chats
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ChatBubbleOutline
@@ -144,6 +146,8 @@ fun ChatListScreen(
     onDirectMessageUser: (UserProfile) -> Unit,
     onUpdateAvailability: (AvailabilityStatus) -> Unit = {},
     onToggleFriendContact: (UserProfile) -> Unit = {},
+    onOpenSatAi: () -> Unit = {},
+    onToggleCommunityAdmin: (communityId: String, targetUserId: String, makeAdmin: Boolean) -> Unit = { _, _, _ -> },
     showNotificationPermissionBanner: Boolean = false,
     onEnableNotificationsClick: () -> Unit = {},
     onDismissNotificationBanner: () -> Unit = {},
@@ -237,6 +241,18 @@ fun ChatListScreen(
                                 contentDescription = "Search"
                             )
                         }
+                    }
+
+                    // SAT Limited AI button
+                    IconButton(
+                        onClick = onOpenSatAi,
+                        modifier = Modifier.testTag("topbar_sat_ai_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "Open SAT Limited AI",
+                            tint = SatTeal
+                        )
                     }
 
                     // Join via Invite Link button
@@ -408,6 +424,7 @@ fun ChatListScreen(
                         onFilterChange = { selectedFilter = it },
                         onChatClick = onChatClick,
                         onNewChatClick = onNewChatClick,
+                        onOpenSatAi = onOpenSatAi,
                         showNotificationPermissionBanner = showNotificationPermissionBanner,
                         onEnableNotificationsClick = onEnableNotificationsClick,
                         onDismissNotificationBanner = onDismissNotificationBanner
@@ -460,11 +477,13 @@ fun ChatListScreen(
                         currentUserId = currentUserId,
                         communities = communities,
                         allChats = chats,
+                        directoryUsers = directoryUsers,
                         onOpenChat = onChatClick,
                         onCreateCommunity = onCreateCommunity,
                         onJoinCommunity = onJoinCommunity,
                         onShareCommunityInvite = onShareCommunityInvite,
                         onOpenJoinInvite = onOpenJoinInvite,
+                        onToggleCommunityAdmin = onToggleCommunityAdmin,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -502,6 +521,7 @@ private fun ChatsTabContent(
     onFilterChange: (String) -> Unit,
     onChatClick: (Chat) -> Unit,
     onNewChatClick: () -> Unit,
+    onOpenSatAi: () -> Unit = {},
     showNotificationPermissionBanner: Boolean = false,
     onEnableNotificationsClick: () -> Unit = {},
     onDismissNotificationBanner: () -> Unit = {}
@@ -612,6 +632,72 @@ private fun ChatsTabContent(
                     ),
                     modifier = Modifier.testTag("filter_chip_groups")
                 )
+            }
+        }
+
+        // Pinned SAT Limited AI Assistant Entry Card
+        Card(
+            onClick = onOpenSatAi,
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = SatElectricBlue.copy(alpha = 0.12f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .testTag("pinned_sat_ai_card")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(SatElectricBlue),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "SAT Limited AI",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "SAT Limited AI",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = SatTeal.copy(alpha = 0.22f)
+                        ) {
+                            Text(
+                                text = "Gemini + Search",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SatTeal,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Ask AI, analyze photos, or search live web info",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 

@@ -25,7 +25,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -97,20 +99,17 @@ private val MANUAL_SECTIONS = listOf(
     ManualSection(
         id = "sign_in",
         category = "Getting Started",
-        title = "Registration & Sign-In (Google & Microsoft)",
+        title = "Registration & Sign-In (Google)",
         icon = Icons.Default.Lock,
         badge = "Zero-Trust",
-        summary = "Register or sign in to SAT Messenger using either your Google or Microsoft account.",
+        summary = "Register or sign in to SAT Messenger securely using your Google account.",
         steps = listOf(
-            "On the Sign-In / Registration screen, choose 'Continue with Google' or 'Continue with Microsoft'.",
-            "Microsoft Sign-In uses OpenID Connect scopes (openid, profile, email, User.Read) and supports organizational & personal accounts via the configured tenant ('common' by default).",
-            "Complete authentication; your profile is automatically created and synced to Cloud Firestore on first sign-in.",
-            "You can also link a Microsoft account later from Profile > Sign-In Methods or tap 'Microsoft Sign-In Setup Guide' for the Firebase redirect URI.",
+            "On the Sign-In / Registration screen, tap 'Continue with Google'.",
+            "Select your Google account via Android Credential Manager; your profile is automatically created and synced to Cloud Firestore on first sign-in.",
             "Need help before signing in? Tap 'App Manual & User Guide' directly on the Registration / Sign-In screen at any time."
         ),
         tips = listOf(
             "Your display name, @username handle, avatar, and real-time availability sync immediately upon registration.",
-            "Workspace admins enabling Microsoft OAuth in Firebase Console use redirect URI https://sat-limited.firebaseapp.com/__/auth/handler.",
             "Anonymous sign-in is disabled to preserve zero-trust security across SAT Limited."
         )
     ),
@@ -236,19 +235,52 @@ private val MANUAL_SECTIONS = listOf(
         )
     ),
     ManualSection(
+        id = "sat_limited_ai",
+        category = "SAT Limited AI",
+        title = "SAT Limited AI Assistant",
+        icon = Icons.Default.AutoAwesome,
+        badge = "AI + Search",
+        summary = "Chat with SAT Limited AI using Smart, Fast, or Reasoning modes, live Google Search grounding, and photo analysis.",
+        steps = listOf(
+            "Tap the pinned 'SAT Limited AI' card on the Chats tab or the sparkle icon in the Chats top bar.",
+            "Choose a response mode: Smart (balanced + search), Fast (low-latency), or Reasoning (deep technical analysis).",
+            "Toggle 'Google Search' to ground answers with live web queries and clickable source citation links.",
+            "Tap the Image icon inside the composer to attach a photo for visual analysis, or tap Clear to reset the thread."
+        ),
+        tips = listOf(
+            "All requests to SAT Limited AI are protected with Firebase App Check and require zero manual API keys."
+        )
+    ),
+    ManualSection(
+        id = "admin_roles_governance",
+        category = "Admin Controls",
+        title = "Admin Promotion in Groups, Channels & Communities",
+        icon = Icons.Default.AdminPanelSettings,
+        badge = "Governance",
+        summary = "Promote trusted members to Admins or dismiss admin privileges in Group Rooms, Channels, and Communities.",
+        steps = listOf(
+            "Group Rooms: Open Group Info or tap the Participants icon in the chat header, then tap 'Make Admin' or 'Dismiss' next to any non-creator member.",
+            "Channels: Open a channel as an admin and tap the Admin shield icon in the top bar (or Channel Settings > Manage Channel Admins) to promote followers or colleagues.",
+            "Communities: Tap the Admin shield icon on any community card in the Communities tab to manage Community Admins."
+        ),
+        tips = listOf(
+            "Creators remain protected from demotion, and Cloud Firestore security rules verify admin privileges server-side."
+        )
+    ),
+    ManualSection(
         id = "whatsapp_status",
         category = "Status & Updates",
         title = "24-Hour Status Updates",
         icon = Icons.Default.DonutLarge,
         badge = "Stories",
-        summary = "Share text or photo status updates that automatically expire after 24 hours.",
+        summary = "Share text, photos, or short videos as status stories that automatically expire after 24 hours.",
         steps = listOf(
             "Open the 'Updates' tab and stay on 'Status'.",
-            "Tap '+' under My Status to pick a background color, write a thought, or attach media.",
-            "Contacts with active statuses show a green ring around their avatar in Chats."
+            "Tap '+' under My Status, then pick a Photo or Video from your gallery via the Photo Picker, or paste a media URL and choose a background color.",
+            "Tap any contact's status update to view images or play shared video clips with inline reply support."
         ),
         tips = listOf(
-            "Reply directly to any contact's status from the story viewer reply bar."
+            "Contacts with active statuses show a green ring around their avatar in Chats."
         )
     ),
     ManualSection(
@@ -257,14 +289,14 @@ private val MANUAL_SECTIONS = listOf(
         title = "Photos, Media & Document Sharing",
         icon = Icons.Default.AttachFile,
         badge = "Zero-Permission",
-        summary = "Share photos and files securely using Android's zero-permission Photo Picker.",
+        summary = "Share photos, short video clips, and files securely in chats and status using Android's zero-permission Photo Picker.",
         steps = listOf(
-            "Tap the paperclip icon on the left side of any chat composer.",
-            "Select 'Photo & Media' or 'Document & Files', review the preview, add an optional caption, and tap Send.",
-            "Tap any image bubble in a chat to open the full-screen viewer, or view all media in Contact / Group Info."
+            "Tap the Image icon in the chat composer (or the paperclip icon > 'Photo & Video' / 'Document & Files').",
+            "Select a photo, video clip, or file, review the preview dialog, add an optional caption, and tap Send.",
+            "Tap any image or video card inside a conversation to open the full-screen viewer/player, or browse shared items under Contact / Group Info."
         ),
         tips = listOf(
-            "Photos are compressed automatically for fast, reliable delivery."
+            "Photos are compressed automatically and clips are validated under real-time sync limits with zero broad storage permissions."
         )
     ),
     ManualSection(
@@ -374,10 +406,12 @@ fun AppManualScreen(
     val categories = listOf(
         "All",
         "Getting Started",
+        "SAT Limited AI",
         "Contacts & Availability",
         "Direct Chats",
         "Voice Clips",
         "Group Rooms",
+        "Admin Controls",
         "Invite Links",
         "Channels",
         "Communities",
@@ -487,7 +521,7 @@ fun AppManualScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Everything you need to know about Google & Microsoft sign-in, live contact availability, direct & group chats, voice clips, invite links, flexible channels, phone notifications, and privacy.",
+                            text = "Everything you need to know about Google sign-in, SAT Limited AI, live contact availability, direct & group chats, admin promotion, voice clips, photo & video media sharing, invite links, flexible channels, phone notifications, and privacy.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.8f)
                         )

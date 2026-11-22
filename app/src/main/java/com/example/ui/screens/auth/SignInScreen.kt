@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,37 +24,30 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -64,20 +58,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.R
-import com.example.data.repository.AuthProvider
 import com.example.data.repository.AuthUiState
 import com.example.ui.components.ErrorCard
-import com.example.ui.components.MicrosoftSetupGuideDialog
 import com.example.ui.screens.manual.AppManualScreen
 import com.example.ui.theme.GoogleBrandBlue
 import com.example.ui.theme.GoogleBrandGreen
 import com.example.ui.theme.GoogleBrandRed
 import com.example.ui.theme.GoogleBrandYellow
-import com.example.ui.theme.MicrosoftBrandBlue
-import com.example.ui.theme.MicrosoftBrandGreen
-import com.example.ui.theme.MicrosoftBrandRed
-import com.example.ui.theme.MicrosoftBrandYellow
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatNavy
 import com.example.ui.theme.SatTeal
@@ -85,19 +75,14 @@ import com.example.ui.theme.SatTeal
 @Composable
 fun SignInScreen(
     authState: AuthUiState,
-    activeProvider: AuthProvider? = null,
     onGoogleSignInClick: (Activity) -> Unit,
-    onMicrosoftSignInClick: (Activity) -> Unit,
     onDismissError: () -> Unit = {},
     onOpenManual: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showInlineManual by remember { mutableStateOf(false) }
-    var showMicrosoftSetupDialog by remember { mutableStateOf(false) }
     val isLoading = authState is AuthUiState.Loading
-    val isGoogleLoading = isLoading && (activeProvider == AuthProvider.GOOGLE || activeProvider == null)
-    val isMicrosoftLoading = isLoading && activeProvider == AuthProvider.MICROSOFT
 
     val bgPrimary = MaterialTheme.colorScheme.background
     val accentTop = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
@@ -201,7 +186,7 @@ fun SignInScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Sign-In Methods Card
+                // Sign-In Card
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
@@ -228,15 +213,14 @@ fun SignInScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Choose Google or your Microsoft account",
+                            text = "Sign in securely with your Google account",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // Current Method: Google Sign-In via Credential Manager
                         OutlinedButton(
                             onClick = {
                                 (context as? Activity)?.let { onGoogleSignInClick(it) }
@@ -256,7 +240,7 @@ fun SignInScreen(
                                 .height(50.dp)
                                 .testTag("google_sign_in_button")
                         ) {
-                            if (isGoogleLoading) {
+                            if (isLoading) {
                                 CircularProgressIndicator(
                                     color = SatElectricBlue,
                                     modifier = Modifier.size(22.dp),
@@ -277,100 +261,14 @@ fun SignInScreen(
                                 }
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            HorizontalDivider(
-                                modifier = Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                            )
-                            Text(
-                                text = stringResource(R.string.sign_in_or_divider),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp)
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // New Method: Microsoft Sign-In via Firebase OAuthProvider
-                        Button(
-                            onClick = {
-                                (context as? Activity)?.let { onMicrosoftSignInClick(it) }
-                            },
-                            enabled = !isLoading,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SatNavy,
-                                contentColor = Color.White,
-                                disabledContainerColor = SatNavy.copy(alpha = 0.5f),
-                                disabledContentColor = Color.White.copy(alpha = 0.7f)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("microsoft_sign_in_button")
-                        ) {
-                            if (isMicrosoftLoading) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    modifier = Modifier.size(22.dp),
-                                    strokeWidth = 2.5.dp
-                                )
-                            } else {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    MicrosoftLogoMark(modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = stringResource(R.string.sign_in_microsoft),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 15.sp,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        TextButton(
-                            onClick = { showMicrosoftSetupDialog = true },
-                            modifier = Modifier.testTag("microsoft_setup_help_button")
-                        ) {
-                            Text(
-                                text = stringResource(R.string.microsoft_setup_help_button),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = SatElectricBlue
-                            )
-                        }
                     }
                 }
 
                 if (authState is AuthUiState.Error) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    val isMicrosoftConfigError = authState.message.contains("Microsoft", ignoreCase = true) ||
-                        authState.message.contains("Firebase Console", ignoreCase = true) ||
-                        authState.message.contains("Azure", ignoreCase = true) ||
-                        authState.message.contains("redirect", ignoreCase = true)
                     ErrorCard(
                         message = authState.message,
-                        onDismiss = onDismissError,
-                        actionLabel = if (isMicrosoftConfigError) "View Setup Guide" else null,
-                        onAction = if (isMicrosoftConfigError) {
-                            { showMicrosoftSetupDialog = true }
-                        } else null
+                        onDismiss = onDismissError
                     )
                 }
 
@@ -457,12 +355,6 @@ fun SignInScreen(
             )
         }
     }
-
-    if (showMicrosoftSetupDialog) {
-        MicrosoftSetupGuideDialog(
-            onDismiss = { showMicrosoftSetupDialog = false }
-        )
-    }
 }
 
 @Composable
@@ -519,41 +411,6 @@ private fun GoogleLogoMark(modifier: Modifier = Modifier) {
             end = Offset(size.width - inset * 0.4f, size.height * 0.50f),
             strokeWidth = strokeWidth,
             cap = StrokeCap.Butt
-        )
-    }
-}
-
-@Composable
-private fun MicrosoftLogoMark(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val gap = size.minDimension * 0.1f
-        val tileWidth = (size.width - gap) / 2f
-        val tileHeight = (size.height - gap) / 2f
-        val tileSize = Size(tileWidth, tileHeight)
-
-        // Top-left: Red
-        drawRect(
-            color = MicrosoftBrandRed,
-            topLeft = Offset.Zero,
-            size = tileSize
-        )
-        // Top-right: Green
-        drawRect(
-            color = MicrosoftBrandGreen,
-            topLeft = Offset(tileWidth + gap, 0f),
-            size = tileSize
-        )
-        // Bottom-left: Blue
-        drawRect(
-            color = MicrosoftBrandBlue,
-            topLeft = Offset(0f, tileHeight + gap),
-            size = tileSize
-        )
-        // Bottom-right: Yellow
-        drawRect(
-            color = MicrosoftBrandYellow,
-            topLeft = Offset(tileWidth + gap, tileHeight + gap),
-            size = tileSize
         )
     }
 }

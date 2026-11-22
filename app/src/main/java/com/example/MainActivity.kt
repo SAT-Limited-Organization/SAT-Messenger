@@ -63,6 +63,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.notifications.AppNotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.example.data.repository.AuthUiState
+import com.example.ui.screens.ai.SatLimitedAiScreen
 import com.example.ui.screens.auth.SignInScreen
 import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.chats.ChatListScreen
@@ -80,6 +81,7 @@ import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatTeal
 import com.example.ui.viewmodel.MessengerViewModel
 import com.example.ui.viewmodel.ScreenState
+import com.example.util.configureAppCheck
 
 class MainActivity : ComponentActivity() {
 
@@ -88,6 +90,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureAppCheck(this, intent)
         enableEdgeToEdge()
         pendingNotificationChatId.value = intent?.getStringExtra(AppNotificationManager.EXTRA_CHAT_ID)
         pendingDeepLinkUri.value = intent?.data?.toString()
@@ -100,8 +103,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val authState by viewModel.authState.collectAsState()
-                val activeAuthProvider by viewModel.activeAuthProvider.collectAsState()
-                val linkedProviderIds by viewModel.linkedProviderIds.collectAsState()
                 val currentScreen by viewModel.currentScreen.collectAsState()
                 val activeChat by viewModel.activeChat.collectAsState()
                 val userProfile by viewModel.userProfile.collectAsState()
@@ -135,6 +136,10 @@ class MainActivity : ComponentActivity() {
                 val inviteLookupError by viewModel.inviteLookupError.collectAsState()
                 val isResolvingInvite by viewModel.isResolvingInvite.collectAsState()
                 val isJoiningInvite by viewModel.isJoiningInvite.collectAsState()
+                val satAiMessages by viewModel.satAiMessages.collectAsState()
+                val satAiUiState by viewModel.satAiUiState.collectAsState()
+                val satAiMode by viewModel.satAiMode.collectAsState()
+                val satAiWebGroundingEnabled by viewModel.satAiWebGroundingEnabled.collectAsState()
 
                 val snackbarHostState = remember { SnackbarHostState() }
                 val lifecycleOwner = LocalLifecycleOwner.current
@@ -349,6 +354,12 @@ class MainActivity : ComponentActivity() {
                                         onToggleFriendContact = { targetUser ->
                                             viewModel.toggleFriendContact(targetUser)
                                         },
+                                        onOpenSatAi = {
+                                            viewModel.openSatAi()
+                                        },
+                                        onToggleCommunityAdmin = { communityId, targetUserId, makeAdmin ->
+                                            viewModel.setCommunityAdminRole(communityId, targetUserId, makeAdmin)
+                                        },
                                         showNotificationPermissionBanner = !hasNotificationPermission && !notificationBannerDismissed,
                                         onEnableNotificationsClick = requestNotificationPermission,
                                         onDismissNotificationBanner = { notificationBannerDismissed = true }
@@ -399,6 +410,11 @@ class MainActivity : ComponentActivity() {
                                                         existingCode = chat.inviteCode
                                                     )
                                                 }
+                                            } else null,
+                                            onToggleGroupAdmin = if (chat.type == "group") {
+                                                { targetUserId, makeAdmin ->
+                                                    viewModel.setGroupAdminRole(chat.id, targetUserId, makeAdmin)
+                                                }
                                             } else null
                                         )
                                     } ?: run {
@@ -439,10 +455,6 @@ class MainActivity : ComponentActivity() {
                                             } else {
                                                 requestNotificationPermission()
                                             }
-                                        },
-                                        linkedProviderIds = linkedProviderIds,
-                                        onLinkMicrosoft = { activity ->
-                                            viewModel.linkMicrosoftAccount(activity)
                                         }
                                     )
                                 }
@@ -450,6 +462,23 @@ class MainActivity : ComponentActivity() {
                                 ScreenState.MANUAL -> {
                                     AppManualScreen(
                                         onBack = { viewModel.navigateTo(ScreenState.CHATS) }
+                                    )
+                                }
+
+                                ScreenState.SAT_AI -> {
+                                    SatLimitedAiScreen(
+                                        messages = satAiMessages,
+                                        uiState = satAiUiState,
+                                        selectedMode = satAiMode,
+                                        webGroundingEnabled = satAiWebGroundingEnabled,
+                                        onBack = { viewModel.navigateTo(ScreenState.CHATS) },
+                                        onSendPrompt = { prompt, bitmap, previewUri ->
+                                            viewModel.sendSatAiPrompt(prompt, bitmap, previewUri)
+                                        },
+                                        onSelectMode = { mode -> viewModel.setSatAiMode(mode) },
+                                        onToggleWebGrounding = { enabled -> viewModel.setSatAiWebGrounding(enabled) },
+                                        onClearConversation = { viewModel.clearSatAiConversation() },
+                                        onDismissError = { viewModel.dismissSatAiError() }
                                     )
                                 }
                             }
@@ -472,6 +501,7 @@ class MainActivity : ComponentActivity() {
                                     channel = channel,
                                     currentUserId = uid,
                                     posts = channelPosts,
+                                    directoryUsers = directoryUsers,
                                     onDismiss = { viewModel.closeChannel() },
                                     onToggleFollow = { viewModel.toggleFollowChannel(it) },
                                     onPostMessage = { text, mediaUrl ->
@@ -491,6 +521,9 @@ class MainActivity : ComponentActivity() {
                                             allowReactions = allowReactions,
                                             inviteCode = channel.inviteCode
                                         )
+                                    },
+                                    onToggleChannelAdmin = { targetUserId, makeAdmin ->
+                                        viewModel.setChannelAdminRole(channel.id, targetUserId, makeAdmin)
                                     },
                                     onDeleteChannel = {
                                         viewModel.deleteChannel(channel)
@@ -626,12 +659,8 @@ class MainActivity : ComponentActivity() {
                     } else {
                         SignInScreen(
                             authState = authState,
-                            activeProvider = activeAuthProvider,
                             onGoogleSignInClick = { activity ->
                                 viewModel.signInWithGoogle(activity)
-                            },
-                            onMicrosoftSignInClick = { activity ->
-                                viewModel.signInWithMicrosoft(activity)
                             },
                             onDismissError = {
                                 viewModel.clearAuthError()

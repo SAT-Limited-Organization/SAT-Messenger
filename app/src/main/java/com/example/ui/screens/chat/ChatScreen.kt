@@ -5,7 +5,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.widget.MediaController
 import android.widget.Toast
+import android.widget.VideoView
 import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -83,6 +85,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -151,41 +154,16 @@ import com.example.ui.theme.SatIncomingBubbleLight
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatOutgoingBubble
 import com.example.ui.theme.SatSlate400
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.ui.theme.SatTeal
 import com.example.ui.theme.SatErrorRed
+import com.example.util.MediaAttachmentHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private fun processImageUriToBase64(context: Context, uri: Uri): String {
-    return try {
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-            val original = BitmapFactory.decodeStream(stream) ?: return uri.toString()
-            val maxDim = 800
-            val width = original.width
-            val height = original.height
-            val scale = if (width > maxDim || height > maxDim) {
-                val ratio = width.toFloat() / height.toFloat()
-                if (ratio > 1) {
-                    val targetW = maxDim
-                    val targetH = (maxDim / ratio).toInt().coerceAtLeast(1)
-                    Bitmap.createScaledBitmap(original, targetW, targetH, true)
-                } else {
-                    val targetH = maxDim
-                    val targetW = (maxDim * ratio).toInt().coerceAtLeast(1)
-                    Bitmap.createScaledBitmap(original, targetW, targetH, true)
-                }
-            } else {
-                original
-            }
-            val baos = ByteArrayOutputStream()
-            scale.compress(Bitmap.CompressFormat.JPEG, 75, baos)
-            val bytes = baos.toByteArray()
-            "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-        } ?: uri.toString()
-    } catch (e: Exception) {
-        uri.toString()
-    }
+    return MediaAttachmentHelper.encodeImageUriToDataUrl(context, uri) ?: uri.toString()
 }
 
 private fun getFileMetadata(context: Context, uri: Uri): Pair<String, Long> {
@@ -233,6 +211,7 @@ fun ChatScreen(
     onTyping: (Boolean) -> Unit = {},
     onReactToMessage: (messageId: String, emoji: String) -> Unit = { _, _ -> },
     onShareGroupInvite: (() -> Unit)? = null,
+    onToggleGroupAdmin: ((targetUserId: String, makeAdmin: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -248,6 +227,7 @@ fun ChatScreen(
     var showClearChatDialog by remember { mutableStateOf(false) }
     var showDeleteChatDialog by remember { mutableStateOf(false) }
     var fullScreenImageUri by remember { mutableStateOf<String?>(null) }
+    var fullScreenVideoUri by remember { mutableStateOf<String?>(null) }
 
     // Voice recorder & playback controllers
     val voiceRecorder = remember(context) { VoiceRecorderManager(context) }
@@ -379,6 +359,7 @@ fun ChatScreen(
     var pendingMediaType by remember { mutableStateOf("image") }
     var pendingMediaName by remember { mutableStateOf<String?>(null) }
     var pendingMediaSize by remember { mutableStateOf<Long?>(null) }
+    var pendingEncodedPayload by remember { mutableStateOf<String?>(null) }
     var showMediaPreviewDialog by remember { mutableStateOf(false) }
     var mediaCaption by remember { mutableStateOf("") }
 
@@ -386,10 +367,16 @@ fun ChatScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
+            val encodedResult = MediaAttachmentHelper.encodeVisualMedia(context, uri)
+            if (encodedResult.errorMessage != null) {
+                Toast.makeText(context, encodedResult.errorMessage, Toast.LENGTH_LONG).show()
+                return@rememberLauncherForActivityResult
+            }
             pendingMediaUri = uri
-            pendingMediaType = "image"
-            pendingMediaName = "Photo_${System.currentTimeMillis()}.jpg"
-            pendingMediaSize = null
+            pendingMediaType = encodedResult.type
+            pendingMediaName = encodedResult.fileName
+            pendingMediaSize = encodedResult.fileSizeBytes
+            pendingEncodedPayload = encodedResult.dataUrlOrUri
             mediaCaption = ""
             showMediaPreviewDialog = true
         }
@@ -399,11 +386,16 @@ fun ChatScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val (name, size) = getFileMetadata(context, uri)
+            val encodedResult = MediaAttachmentHelper.encodeDocumentOrFile(context, uri)
+            if (encodedResult.errorMessage != null) {
+                Toast.makeText(context, encodedResult.errorMessage, Toast.LENGTH_LONG).show()
+                return@rememberLauncherForActivityResult
+            }
             pendingMediaUri = uri
-            pendingMediaType = "file"
-            pendingMediaName = name
-            pendingMediaSize = size
+            pendingMediaType = encodedResult.type
+            pendingMediaName = encodedResult.fileName
+            pendingMediaSize = encodedResult.fileSizeBytes
+            pendingEncodedPayload = encodedResult.dataUrlOrUri
             mediaCaption = ""
             showMediaPreviewDialog = true
         }
@@ -432,7 +424,8 @@ fun ChatScreen(
             },
             onClearChat = onClearChat,
             onDeleteChat = onDeleteChat,
-            onShareGroupInvite = onShareGroupInvite
+            onShareGroupInvite = onShareGroupInvite,
+            onToggleGroupAdmin = onToggleGroupAdmin
         )
         return
     }
@@ -819,14 +812,14 @@ fun ChatScreen(
                                     onDismissRequest = { showAttachmentMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Photo & Media") },
+                                        text = { Text("Photo & Video") },
                                         leadingIcon = {
                                             Icon(imageVector = Icons.Default.Image, contentDescription = null, tint = SatElectricBlue)
                                         },
                                         onClick = {
                                             showAttachmentMenu = false
                                             photoPickerLauncher.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
                                             )
                                         },
                                         modifier = Modifier.testTag("pick_photo_menu_item")
@@ -854,6 +847,21 @@ fun ChatScreen(
                                         modifier = Modifier.testTag("pick_voice_menu_item")
                                     )
                                 }
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                    )
+                                },
+                                modifier = Modifier.testTag("quick_media_picker_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = "Send Photo or Video",
+                                    tint = SatTeal
+                                )
                             }
 
                             OutlinedTextField(
@@ -966,6 +974,7 @@ fun ChatScreen(
                         },
                         onReact = { emoji -> onReactToMessage(message.id, emoji) },
                         onImageClick = { fullScreenImageUri = it },
+                        onVideoClick = { fullScreenVideoUri = it },
                         audioPlaybackState = audioPlaybackState,
                         onToggleAudioPlay = { msg ->
                             msg.attachmentUrl?.let { url ->
@@ -1005,6 +1014,7 @@ fun ChatScreen(
             chat = chat,
             registeredUsers = registeredUsers,
             currentUserId = currentUserId,
+            onToggleAdmin = onToggleGroupAdmin,
             onDismiss = { showParticipantsDialog = false }
         )
     }
@@ -1024,43 +1034,52 @@ fun ChatScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (pendingMediaType == "image") "Send Photo" else "Send Document",
+                        text = when (pendingMediaType) {
+                            "image" -> "Send Photo"
+                            "video" -> "Send Video Clip"
+                            else -> "Send Document"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    if (pendingMediaType == "image") {
-                        AsyncImage(
-                            model = pendingMediaUri,
-                            contentDescription = "Preview",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                        )
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                    when (pendingMediaType) {
+                        "image" -> {
+                            AsyncImage(
+                                model = pendingMediaUri,
+                                contentDescription = "Preview",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                            )
+                        }
+                        "video" -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF0A2540),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.InsertDriveFile,
-                                    contentDescription = null,
-                                    tint = SatElectricBlue,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
+                                Column(
+                                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Videocam,
+                                        contentDescription = "Selected Video Clip",
+                                        tint = SatTeal,
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = pendingMediaName ?: "Document",
+                                        text = pendingMediaName ?: "Video Clip",
                                         fontWeight = FontWeight.Bold,
+                                        color = Color.White,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -1068,8 +1087,43 @@ fun ChatScreen(
                                         Text(
                                             text = formatFileSize(it),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = SatTeal
                                         )
+                                    }
+                                }
+                            }
+                        }
+                        else -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.InsertDriveFile,
+                                        contentDescription = null,
+                                        tint = SatElectricBlue,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = pendingMediaName ?: "Document",
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        pendingMediaSize?.let {
+                                            Text(
+                                                text = formatFileSize(it),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1100,12 +1154,12 @@ fun ChatScreen(
                         Button(
                             onClick = {
                                 val uri = pendingMediaUri
-                                if (uri != null) {
+                                val payload = pendingEncodedPayload
+                                if (uri != null || !payload.isNullOrBlank()) {
                                     showMediaPreviewDialog = false
-                                    val encoded = if (pendingMediaType == "image") {
-                                        processImageUriToBase64(context, uri)
-                                    } else {
-                                        uri.toString()
+                                    val encoded = payload?.takeIf { it.isNotBlank() } ?: when (pendingMediaType) {
+                                        "image" -> processImageUriToBase64(context, uri!!)
+                                        else -> uri?.toString().orEmpty()
                                     }
                                     if (onSendMediaMessage != null) {
                                         onSendMediaMessage(
@@ -1156,6 +1210,54 @@ fun ChatScreen(
                         .padding(16.dp)
                 ) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                }
+            }
+        }
+    }
+
+    // Full Screen Video Player Modal
+    if (fullScreenVideoUri != null) {
+        val playableVideoUri = remember(fullScreenVideoUri) {
+            MediaAttachmentHelper.resolvePlayableVideoUri(context, fullScreenVideoUri!!)
+        }
+        Dialog(onDismissRequest = { fullScreenVideoUri = null }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.96f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (playableVideoUri != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            VideoView(ctx).apply {
+                                val controller = MediaController(ctx)
+                                controller.setAnchorView(this)
+                                setMediaController(controller)
+                                setVideoURI(playableVideoUri)
+                                setOnPreparedListener { mp ->
+                                    mp.isLooping = true
+                                    start()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(340.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Unable to decode video clip for playback.",
+                        color = Color.White
+                    )
+                }
+                IconButton(
+                    onClick = { fullScreenVideoUri = null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close video", tint = Color.White)
                 }
             }
         }
@@ -1398,6 +1500,7 @@ fun GroupParticipantsDialog(
     chat: Chat,
     registeredUsers: List<UserProfile>,
     currentUserId: String,
+    onToggleAdmin: ((targetUserId: String, makeAdmin: Boolean) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val participants = remember(chat.memberIds, registeredUsers) {
@@ -1405,10 +1508,11 @@ fun GroupParticipantsDialog(
             registeredUsers.firstOrNull { it.userId == memberId }
                 ?: UserProfile(
                     userId = memberId,
-                    displayName = if (memberId == currentUserId) "You" else "User_${memberId.take(6)}"
+                    displayName = if (memberId == currentUserId) "You" else chat.participantNames[memberId] ?: "User_${memberId.take(6)}"
                 )
         }
     }
+    val callerCanManageAdmins = chat.createdBy == currentUserId || chat.adminIds.contains(currentUserId)
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1454,7 +1558,13 @@ fun GroupParticipantsDialog(
                 ) {
                     items(participants, key = { it.userId }) { member ->
                         val isSelf = member.userId == currentUserId
-                        val isAdmin = chat.adminIds.contains(member.userId)
+                        val isCreator = chat.createdBy.isNotBlank() && chat.createdBy == member.userId
+                        val isAdmin = isCreator || chat.adminIds.contains(member.userId)
+                        val canToggle = callerCanManageAdmins &&
+                            onToggleAdmin != null &&
+                            !isCreator &&
+                            !(isSelf && chat.adminIds.size <= 1)
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -1475,7 +1585,22 @@ fun GroupParticipantsDialog(
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.SemiBold
                                     )
-                                    if (isAdmin) {
+                                    if (isCreator) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = SatTeal.copy(alpha = 0.2f)
+                                        ) {
+                                            Text(
+                                                text = "CREATOR",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = SatTeal,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    } else if (isAdmin) {
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Surface(
                                             shape = RoundedCornerShape(4.dp),
@@ -1497,6 +1622,19 @@ fun GroupParticipantsDialog(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (member.isOnline) SatOnlineGreen else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            }
+                            if (canToggle) {
+                                TextButton(
+                                    onClick = { onToggleAdmin?.invoke(member.userId, !isAdmin) },
+                                    modifier = Modifier.testTag("dialog_toggle_group_admin_${member.userId}")
+                                ) {
+                                    Text(
+                                        text = if (isAdmin) "Dismiss" else "Make Admin",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isAdmin) SatErrorRed else SatElectricBlue
+                                    )
+                                }
                             }
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))

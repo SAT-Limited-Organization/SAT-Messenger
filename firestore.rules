@@ -97,7 +97,7 @@ service cloud.firestore {
              data.senderName is string && data.senderName.size() <= 100 &&
              data.text is string && data.text.size() <= 10000 &&
              data.memberIds is list && data.memberIds.size() <= 100 &&
-             (!('type' in data) || data.type in ['text', 'image', 'file', 'audio']) &&
+             (!('type' in data) || data.type in ['text', 'image', 'file', 'audio', 'video']) &&
              (!('attachmentUrl' in data) || data.attachmentUrl == null || (data.attachmentUrl is string && data.attachmentUrl.size() <= 500000)) &&
              (!('replyToId' in data) || data.replyToId == null || (data.replyToId is string && data.replyToId.size() <= 128)) &&
              (!('replyToText' in data) || data.replyToText == null || (data.replyToText is string && data.replyToText.size() <= 500)) &&
@@ -268,7 +268,15 @@ service cloud.firestore {
                        request.auth.uid in existing().memberIds &&
                        request.auth.uid in incoming().memberIds &&
                        incoming().createdAt == existing().createdAt &&
-                       isValidChat(incoming());
+                       isValidChat(incoming()) &&
+                       (
+                         !incoming().diff(existing()).affectedKeys().hasAny(['adminIds']) ||
+                         (
+                           (!('adminIds' in existing()) || existing().adminIds == null || existing().adminIds.size() == 0 || request.auth.uid in existing().adminIds) &&
+                           incoming().adminIds is list &&
+                           incoming().adminIds.size() >= 1
+                         )
+                       );
 
       allow delete: if isSignedIn() &&
                        isValidId(chatId) &&
@@ -336,7 +344,20 @@ service cloud.firestore {
                            request.auth.uid in existing().memberIds &&
                            request.auth.uid in incoming().memberIds &&
                            incoming().createdAt == existing().createdAt &&
-                           isValidChatRoom(incoming())
+                           (!('createdBy' in existing()) || incoming().createdBy == existing().createdBy) &&
+                           isValidChatRoom(incoming()) &&
+                           (
+                             !incoming().diff(existing()).affectedKeys().hasAny(['adminIds']) ||
+                             (
+                               (
+                                 ('createdBy' in existing() && request.auth.uid == existing().createdBy) ||
+                                 ('adminIds' in existing() && existing().adminIds is list && request.auth.uid in existing().adminIds)
+                               ) &&
+                               incoming().adminIds is list &&
+                               incoming().adminIds.size() >= 1 &&
+                               (!('createdBy' in existing()) || existing().createdBy == null || existing().createdBy == '' || existing().createdBy in incoming().adminIds)
+                             )
+                           )
                          ) ||
                          (
                            'inviteCode' in existing() &&
@@ -428,9 +449,18 @@ service cloud.firestore {
 
       allow update: if isSignedIn() &&
                        isValidId(channelId) &&
-                       (request.auth.uid == existing().creatorId ||
-                        (request.auth.uid in existing().adminIds) ||
-                        incoming().diff(existing()).affectedKeys().hasOnly(['subscriberIds', 'followerCount']));
+                       isValidChannel(incoming()) &&
+                       incoming().creatorId == existing().creatorId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         (
+                           (request.auth.uid == existing().creatorId ||
+                            ('adminIds' in existing() && existing().adminIds is list && request.auth.uid in existing().adminIds)) &&
+                           (!incoming().diff(existing()).affectedKeys().hasAny(['adminIds']) ||
+                            (incoming().adminIds is list && existing().creatorId in incoming().adminIds))
+                         ) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['subscriberIds', 'followerCount'])
+                       );
 
       allow delete: if isSignedIn() &&
                        isValidId(channelId) &&
@@ -480,9 +510,18 @@ service cloud.firestore {
 
       allow update: if isSignedIn() &&
                        isValidId(communityId) &&
-                       (request.auth.uid == existing().creatorId ||
-                        (request.auth.uid in existing().adminIds) ||
-                        incoming().diff(existing()).affectedKeys().hasOnly(['memberIds', 'subgroupChatIds']));
+                       isValidCommunity(incoming()) &&
+                       incoming().creatorId == existing().creatorId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         (
+                           (request.auth.uid == existing().creatorId ||
+                            ('adminIds' in existing() && existing().adminIds is list && request.auth.uid in existing().adminIds)) &&
+                           (!incoming().diff(existing()).affectedKeys().hasAny(['adminIds']) ||
+                            (incoming().adminIds is list && existing().creatorId in incoming().adminIds))
+                         ) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['memberIds', 'subgroupChatIds'])
+                       );
 
       allow delete: if isSignedIn() &&
                        isValidId(communityId) &&

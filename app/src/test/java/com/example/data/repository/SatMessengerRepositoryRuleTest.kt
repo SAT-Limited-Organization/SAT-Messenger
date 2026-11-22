@@ -407,6 +407,152 @@ class SatMessengerRepositoryRuleTest : FirestoreEmulatorTestBase() {
         }
     }
 
+    @Test
+    fun adminPromotion_groupChannelCommunity_andVideoMedia_succeedsAndEnforcesRoles() {
+        runBlocking {
+            val aliceUid = signInTestUser(ALICE_EMAIL)
+            val chatRepo = ChatRepository(firestore)
+            val socialRepo = SocialFeaturesRepository(firestore)
+            val inviteRepo = InviteRepository(firestore)
+
+            // 1. Alice creates a group room, channel, and community
+            val roomId = withTimeout(DEFAULT_TIMEOUT_MS) {
+                chatRepo.createGroupRoom(
+                    name = "Payload Command Room",
+                    description = "Group admin role verification",
+                    selectedMemberIds = emptyList(),
+                    currentUserName = "Alice"
+                ).getOrThrow()
+            }
+            val channelId = withTimeout(DEFAULT_TIMEOUT_MS) {
+                socialRepo.createChannel(
+                    name = "Launch Updates",
+                    description = "Channel admin role verification",
+                    iconUrl = null,
+                    category = "Announcements",
+                    isPublic = true,
+                    allowFollowerPosts = false,
+                    allowReactions = true
+                ).getOrThrow()
+            }
+            val communityId = withTimeout(DEFAULT_TIMEOUT_MS) {
+                socialRepo.createCommunity(
+                    name = "SAT Ground Division",
+                    description = "Community admin role verification",
+                    iconUrl = null,
+                    subgroupChatIds = listOf(roomId)
+                ).getOrThrow()
+            }
+
+            // Send a video message in the group room and post a video status
+            val videoMsgRes = withTimeout(DEFAULT_TIMEOUT_MS) {
+                chatRepo.sendMessage(
+                    chatId = roomId,
+                    senderName = "Alice",
+                    text = "Telemetry clip",
+                    type = "video",
+                    attachmentUrl = "data:video/mp4;base64,AAAAIGZ0eXBpc29t",
+                    fileName = "clip.mp4",
+                    fileSize = 2048L
+                )
+            }
+            assertTrue("Expected video message in group room to succeed", videoMsgRes.isSuccess)
+
+            val videoStatusRes = withTimeout(DEFAULT_TIMEOUT_MS) {
+                socialRepo.postStatus(
+                    userName = "Alice",
+                    userAvatarUrl = null,
+                    text = "Launchpad check",
+                    mediaUrl = "data:video/mp4;base64,AAAAIGZ0eXBpc29t"
+                )
+            }
+            assertTrue("Expected video status upload to succeed", videoStatusRes.isSuccess)
+
+            val groupInvite = withTimeout(DEFAULT_TIMEOUT_MS) {
+                inviteRepo.getOrCreateInviteLink("group", roomId, "Payload Command Room").getOrThrow()
+            }
+
+            // 2. Bob signs in, joins room/channel/community, and fails unauthorized promotion
+            val bobUid = signInTestUser(BOB_EMAIL)
+            val bobChatRepo = ChatRepository(firestore)
+            val bobSocialRepo = SocialFeaturesRepository(firestore)
+            val bobInviteRepo = InviteRepository(firestore)
+
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobInviteRepo.redeemInviteLink(groupInvite).getOrThrow()
+                bobSocialRepo.joinCommunity(communityId).getOrThrow()
+            }
+
+            val unauthGroupPromo = withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobChatRepo.setGroupAdminRole(roomId, bobUid, makeAdmin = true)
+            }
+            assertTrue("Non-admin Bob must be denied promoting himself in group", unauthGroupPromo.isFailure)
+
+            val unauthChannelPromo = withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobSocialRepo.setChannelAdminRole(channelId, bobUid, makeAdmin = true)
+            }
+            assertTrue("Non-admin Bob must be denied promoting himself in channel", unauthChannelPromo.isFailure)
+
+            val unauthCommPromo = withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobSocialRepo.setCommunityAdminRole(communityId, bobUid, makeAdmin = true)
+            }
+            assertTrue("Non-admin Bob must be denied promoting himself in community", unauthCommPromo.isFailure)
+
+            // 3. Alice signs back in and promotes Bob in Group, Channel, and Community
+            signInTestUser(ALICE_EMAIL)
+            assertTrue(
+                "Creator Alice should promote Bob in group",
+                withTimeout(DEFAULT_TIMEOUT_MS) { chatRepo.setGroupAdminRole(roomId, bobUid, makeAdmin = true) }.isSuccess
+            )
+            assertTrue(
+                "Creator Alice should promote Bob in channel",
+                withTimeout(DEFAULT_TIMEOUT_MS) { socialRepo.setChannelAdminRole(channelId, bobUid, makeAdmin = true) }.isSuccess
+            )
+            assertTrue(
+                "Creator Alice should promote Bob in community",
+                withTimeout(DEFAULT_TIMEOUT_MS) { socialRepo.setCommunityAdminRole(communityId, bobUid, makeAdmin = true) }.isSuccess
+            )
+
+            // 4. Bob is now admin: creator demotion must fail, while admin state reflects Bob
+            signInTestUser(BOB_EMAIL)
+            val demoteCreatorGroup = withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobChatRepo.setGroupAdminRole(roomId, aliceUid, makeAdmin = false)
+            }
+            assertTrue("Demoting group creator must fail", demoteCreatorGroup.isFailure)
+
+            val demoteCreatorChan = withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobSocialRepo.setChannelAdminRole(channelId, aliceUid, makeAdmin = false)
+            }
+            assertTrue("Demoting channel creator must fail", demoteCreatorChan.isFailure)
+
+            val demoteCreatorComm = withTimeout(DEFAULT_TIMEOUT_MS) {
+                bobSocialRepo.setCommunityAdminRole(communityId, aliceUid, makeAdmin = false)
+            }
+            assertTrue("Demoting community creator must fail", demoteCreatorComm.isFailure)
+
+            // 5. Alice dismisses Bob back to regular member
+            signInTestUser(ALICE_EMAIL)
+            assertTrue(
+                "Creator Alice should dismiss Bob in group",
+                withTimeout(DEFAULT_TIMEOUT_MS) { chatRepo.setGroupAdminRole(roomId, bobUid, makeAdmin = false) }.isSuccess
+            )
+            assertTrue(
+                "Creator Alice should dismiss Bob in channel",
+                withTimeout(DEFAULT_TIMEOUT_MS) { socialRepo.setChannelAdminRole(channelId, bobUid, makeAdmin = false) }.isSuccess
+            )
+            assertTrue(
+                "Creator Alice should dismiss Bob in community",
+                withTimeout(DEFAULT_TIMEOUT_MS) { socialRepo.setCommunityAdminRole(communityId, bobUid, makeAdmin = false) }.isSuccess
+            )
+
+            val updatedRooms = withTimeout(FLOW_TIMEOUT_MS) {
+                chatRepo.observeUserChatRooms(aliceUid).first { rooms -> rooms.any { it.id == roomId } }
+            }
+            val updatedRoom = updatedRooms.first { it.id == roomId }
+            assertEquals(listOf(aliceUid), updatedRoom.adminIds)
+        }
+    }
+
     private companion object {
         const val ALICE_EMAIL = "alice_test@satlimited.com"
         const val BOB_EMAIL = "bob_test@satlimited.com"
@@ -414,3 +560,4 @@ class SatMessengerRepositoryRuleTest : FirestoreEmulatorTestBase() {
         const val FLOW_TIMEOUT_MS = 4000L
     }
 }
+

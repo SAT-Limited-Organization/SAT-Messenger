@@ -1,5 +1,6 @@
 package com.example.ui.screens.communities
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,13 +19,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,10 +58,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.Chat
 import com.example.data.model.Community
+import com.example.data.model.UserProfile
+import com.example.ui.components.UserAvatar
 import com.example.ui.theme.SatElectricBlue
+import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
 import com.example.ui.theme.SatTeal
 
@@ -66,15 +75,19 @@ fun CommunitiesScreen(
     currentUserId: String,
     communities: List<Community>,
     allChats: List<Chat>,
+    directoryUsers: List<UserProfile> = emptyList(),
     onOpenChat: (Chat) -> Unit,
     onCreateCommunity: (name: String, description: String?, subgroups: List<String>) -> Unit,
     onJoinCommunity: (String) -> Unit,
     onShareCommunityInvite: (Community) -> Unit = {},
     onOpenJoinInvite: () -> Unit = {},
+    onToggleCommunityAdmin: (communityId: String, targetUserId: String, makeAdmin: Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var activeAdminsCommunityId by remember { mutableStateOf<String?>(null) }
 
+    Box(modifier = modifier.fillMaxSize()) {
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
@@ -87,7 +100,7 @@ fun CommunitiesScreen(
                 Icon(imageVector = Icons.Default.Groups, contentDescription = "New Community", modifier = Modifier.size(28.dp))
             }
         },
-        modifier = modifier
+        modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -239,6 +252,16 @@ fun CommunitiesScreen(
                                     )
                                 }
                                 IconButton(
+                                    onClick = { activeAdminsCommunityId = community.id },
+                                    modifier = Modifier.testTag("community_manage_admins_${community.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AdminPanelSettings,
+                                        contentDescription = "Manage Community Admins",
+                                        tint = SatTeal
+                                    )
+                                }
+                                IconButton(
                                     onClick = { onShareCommunityInvite(community) },
                                     modifier = Modifier.testTag("share_community_invite_${community.id}")
                                 ) {
@@ -338,6 +361,31 @@ fun CommunitiesScreen(
         }
     }
 
+        activeAdminsCommunityId?.let { cid ->
+            communities.firstOrNull { it.id == cid }?.let { community ->
+                BackHandler { activeAdminsCommunityId = null }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clickable { activeAdminsCommunityId = null }
+                        .padding(20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CommunityAdminsCard(
+                        community = community,
+                        currentUserId = currentUserId,
+                        directoryUsers = directoryUsers,
+                        onToggleAdmin = { targetUserId, makeAdmin ->
+                            onToggleCommunityAdmin(community.id, targetUserId, makeAdmin)
+                        },
+                        onDismiss = { activeAdminsCommunityId = null }
+                    )
+                }
+            }
+        }
+    }
+
     if (showCreateDialog) {
         CreateCommunityDialog(
             onDismiss = { showCreateDialog = false },
@@ -347,6 +395,166 @@ fun CommunitiesScreen(
             }
         )
     }
+}
+
+@Composable
+private fun CommunityAdminsCard(
+    community: Community,
+    currentUserId: String,
+    directoryUsers: List<UserProfile>,
+    onToggleAdmin: (targetUserId: String, makeAdmin: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val callerIsAdmin = community.creatorId == currentUserId || community.adminIds.contains(currentUserId)
+    val allMemberIds = remember(community.creatorId, community.adminIds, community.memberIds, directoryUsers) {
+        (listOf(community.creatorId) + community.adminIds + community.memberIds + directoryUsers.map { it.userId })
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val candidates = remember(allMemberIds, directoryUsers, searchQuery, currentUserId) {
+        allMemberIds.map { uid ->
+            directoryUsers.firstOrNull { it.userId == uid } ?: UserProfile(
+                userId = uid,
+                displayName = if (uid == currentUserId) "You" else "SAT Member (${uid.take(6)})"
+            )
+        }.filter { user ->
+            val q = searchQuery.trim()
+            q.isBlank() ||
+                user.displayName.contains(q, ignoreCase = true) ||
+                user.email.contains(q, ignoreCase = true)
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = false, onClick = {})
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Community Admins",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${community.name} • ${community.adminIds.size} admins",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SatTeal
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search members or colleagues...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                ) {
+                    items(candidates, key = { it.userId }) { user ->
+                        val isCreator = user.userId == community.creatorId
+                        val isUserAdmin = isCreator || community.adminIds.contains(user.userId)
+                        val isMember = community.memberIds.contains(user.userId)
+                        val canToggle = callerIsAdmin && !isCreator
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            UserAvatar(
+                                name = user.displayName,
+                                avatarUrl = user.avatarUrl,
+                                isOnline = user.isOnline,
+                                size = 40.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (user.userId == currentUserId) "${user.displayName} (You)" else user.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = when {
+                                        isCreator -> "Community Creator"
+                                        isUserAdmin -> "Community Admin"
+                                        isMember -> "Member"
+                                        else -> user.email.ifBlank { "SAT Colleague" }
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isUserAdmin) SatTeal else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (canToggle) {
+                                TextButton(
+                                    onClick = { onToggleAdmin(user.userId, !isUserAdmin) },
+                                    modifier = Modifier.testTag("toggle_community_admin_${user.userId}")
+                                ) {
+                                    Text(
+                                        text = if (isUserAdmin) "Dismiss" else "Make Admin",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isUserAdmin) SatErrorRed else SatElectricBlue
+                                    )
+                                }
+                            } else if (isCreator) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = SatTeal.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = "Creator",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SatTeal,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Done")
+                }
+            }
+        }
 }
 
 @Composable

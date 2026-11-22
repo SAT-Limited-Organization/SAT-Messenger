@@ -1,6 +1,5 @@
 package com.example.ui.screens.profile
 
-import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -32,9 +31,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -74,7 +71,6 @@ import com.example.data.model.BlockedUser
 import com.example.data.model.PrivacySettings
 import com.example.data.model.UserProfile
 import com.example.ui.components.AvailabilityStatusPill
-import com.example.ui.components.MicrosoftSetupGuideDialog
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.availabilityColor
 import com.example.ui.theme.SatElectricBlue
@@ -101,11 +97,8 @@ fun ProfileScreen(
     onToggleSystemNotifications: (Boolean) -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
     onSendTestNotification: () -> Unit = {},
-    linkedProviderIds: List<String> = emptyList(),
-    onLinkMicrosoft: (Activity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     BackHandler { onBack() }
 
     var displayName by remember(userProfile) { mutableStateOf(userProfile?.displayName ?: "") }
@@ -114,7 +107,6 @@ fun ProfileScreen(
     var readReceipts by remember(privacySettings) { mutableStateOf(privacySettings.readReceipts) }
     var lastSeenVisible by remember(privacySettings) { mutableStateOf(privacySettings.lastSeenVisible) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showMicrosoftSetupDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -561,9 +553,7 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Connected Sign-In Methods Card
-                val hasGoogle = linkedProviderIds.contains("google.com")
-                val hasMicrosoft = linkedProviderIds.contains("microsoft.com")
+                // Connected Sign-In Method Card
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(16.dp),
@@ -579,72 +569,22 @@ fun ProfileScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Sign-In Methods",
+                                text = "Sign-In Method",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = SatOnlineGreen.copy(alpha = 0.14f)
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (hasGoogle) SatOnlineGreen.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Text(
-                                    text = if (hasGoogle) "Google: Connected" else "Google: Not linked",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (hasGoogle) SatOnlineGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (hasMicrosoft) SatOnlineGreen.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Text(
-                                    text = if (hasMicrosoft) "Microsoft: Connected" else "Microsoft: Not linked",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (hasMicrosoft) SatOnlineGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
-                            }
-                        }
-                        if (!hasMicrosoft) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            OutlinedButton(
-                                onClick = {
-                                    (context as? Activity)?.let { onLinkMicrosoft(it) }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("link_microsoft_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = SatElectricBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Link Microsoft Account")
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            TextButton(
-                                onClick = { showMicrosoftSetupDialog = true },
-                                modifier = Modifier
-                                    .align(Alignment.CenterHorizontally)
-                                    .testTag("profile_microsoft_setup_help_button")
-                            ) {
-                                Text(
-                                    text = "Microsoft Setup Guide",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = SatElectricBlue
-                                )
-                            }
+                            Text(
+                                text = "Google Account: Connected",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = SatOnlineGreen,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
                         }
                     }
                 }
@@ -721,12 +661,6 @@ fun ProfileScreen(
                         Text("Cancel")
                     }
                 }
-            )
-        }
-
-        if (showMicrosoftSetupDialog) {
-            MicrosoftSetupGuideDialog(
-                onDismiss = { showMicrosoftSetupDialog = false }
             )
         }
     }

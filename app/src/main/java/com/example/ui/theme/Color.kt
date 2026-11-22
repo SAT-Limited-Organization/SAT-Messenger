@@ -38,8 +38,3 @@ val GoogleBrandBlue = Color(0xFF4285F4)
 val GoogleBrandRed = Color(0xFFEA4335)
 val GoogleBrandYellow = Color(0xFFFBBC05)
 val GoogleBrandGreen = Color(0xFF34A853)
-
-val MicrosoftBrandRed = Color(0xFFF25022)
-val MicrosoftBrandGreen = Color(0xFF7FBA00)
-val MicrosoftBrandBlue = Color(0xFF00A4EF)
-val MicrosoftBrandYellow = Color(0xFFFFB900)

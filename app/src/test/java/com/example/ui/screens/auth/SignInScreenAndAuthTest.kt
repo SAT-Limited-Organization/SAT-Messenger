@@ -1,7 +1,5 @@
 package com.example.ui.screens.auth
 
-import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,17 +11,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
-import com.example.data.repository.AuthProvider
 import com.example.data.repository.AuthRepository
 import com.example.data.repository.AuthUiState
 import com.example.ui.theme.SATMessengerTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
-import com.google.firebase.auth.FirebaseAuthException
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
-import com.google.firebase.auth.FirebaseAuthWebException
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -57,50 +50,42 @@ class SignInScreenAndAuthTest {
     }
 
     @Test
-    fun signInScreen_rendersBothGoogleAndMicrosoftButtons_andInvokesCallbacks() {
+    fun signInScreen_rendersGoogleSignInButton_andInvokesCallback() {
         var googleClicks = 0
-        var microsoftClicks = 0
 
         composeRule.setContent {
             SATMessengerTheme {
                 SignInScreen(
                     authState = AuthUiState.Unauthenticated,
-                    onGoogleSignInClick = { googleClicks++ },
-                    onMicrosoftSignInClick = { microsoftClicks++ }
+                    onGoogleSignInClick = { googleClicks++ }
                 )
             }
         }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("google_sign_in_button").performScrollTo().assertIsDisplayed().assertIsEnabled()
-        composeRule.onNodeWithTag("microsoft_sign_in_button").performScrollTo().assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithText("Continue with Google").assertIsDisplayed()
-        composeRule.onNodeWithText("Continue with Microsoft").assertIsDisplayed()
+        composeRule.onNodeWithTag("microsoft_sign_in_button").assertDoesNotExist()
 
         composeRule.onNodeWithTag("google_sign_in_button").performScrollTo().performClick()
-        composeRule.onNodeWithTag("microsoft_sign_in_button").performScrollTo().performClick()
         composeRule.waitForIdle()
 
         assertEquals(1, googleClicks)
-        assertEquals(1, microsoftClicks)
     }
 
     @Test
-    fun signInScreen_disablesBothButtonsDuringMicrosoftLoading() {
+    fun signInScreen_disablesGoogleButtonDuringLoading() {
         composeRule.setContent {
             SATMessengerTheme {
                 SignInScreen(
                     authState = AuthUiState.Loading,
-                    activeProvider = AuthProvider.MICROSOFT,
-                    onGoogleSignInClick = {},
-                    onMicrosoftSignInClick = {}
+                    onGoogleSignInClick = {}
                 )
             }
         }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("google_sign_in_button").performScrollTo().assertIsNotEnabled()
-        composeRule.onNodeWithTag("microsoft_sign_in_button").performScrollTo().assertIsNotEnabled()
     }
 
     @Test
@@ -110,9 +95,8 @@ class SignInScreenAndAuthTest {
         composeRule.setContent {
             SATMessengerTheme {
                 SignInScreen(
-                    authState = AuthUiState.Error("Microsoft Sign-In not enabled yet"),
+                    authState = AuthUiState.Error("Google sign-in failed"),
                     onGoogleSignInClick = {},
-                    onMicrosoftSignInClick = {},
                     onDismissError = { dismissed = true }
                 )
             }
@@ -120,7 +104,7 @@ class SignInScreenAndAuthTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("auth_error_card").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Microsoft Sign-In not enabled yet").assertIsDisplayed()
+        composeRule.onNodeWithText("Google sign-in failed").assertIsDisplayed()
         composeRule.onNodeWithTag("dismiss_error_button").performScrollTo().performClick()
         composeRule.waitForIdle()
 
@@ -128,77 +112,9 @@ class SignInScreenAndAuthTest {
     }
 
     @Test
-    fun authRepository_buildMicrosoftProvider_andErrorMapping() {
+    fun authRepository_resolvesDefaultWebClientId() {
         val repo = AuthRepository(context)
-        val provider = repo.buildMicrosoftProvider()
-        assertEquals("microsoft.com", provider.providerId)
-        assertEquals(listOf("openid", "profile", "email", "User.Read"), repo.getMicrosoftScopes())
-        assertEquals("common", repo.getMicrosoftTenantId())
         assertTrue(!repo.resolveDefaultWebClientId().isNullOrBlank())
-
-        val collisionMsg = repo.mapMicrosoftAuthError(
-            FirebaseAuthUserCollisionException("ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL", "exists")
-        )
-        assertTrue(collisionMsg?.contains("Google", ignoreCase = true) == true)
-
-        val notAllowedMsg = repo.mapMicrosoftAuthError(
-            FirebaseAuthException("ERROR_OPERATION_NOT_ALLOWED", "disabled")
-        )
-        assertTrue(notAllowedMsg?.contains("Firebase Console", ignoreCase = true) == true)
-        assertTrue(notAllowedMsg?.contains(AuthRepository.FIREBASE_REDIRECT_URI) == true)
-
-        val networkMsg = repo.mapMicrosoftAuthError(
-            FirebaseAuthException("ERROR_NETWORK_REQUEST_FAILED", "offline")
-        )
-        assertTrue(networkMsg?.contains("Network error", ignoreCase = true) == true)
-
-        val browserMsg = repo.mapMicrosoftAuthError(
-            ActivityNotFoundException("No browser")
-        )
-        assertTrue(browserMsg?.contains("browser", ignoreCase = true) == true)
-
-        val aadstsRedirectMsg = repo.mapMicrosoftAuthError(
-            IllegalStateException("AADSTS50011: The redirect URI specified in the request does not match.")
-        )
-        assertTrue(aadstsRedirectMsg?.contains(AuthRepository.FIREBASE_REDIRECT_URI) == true)
-
-        val aadstsSecretMsg = repo.mapMicrosoftAuthError(
-            IllegalStateException("AADSTS7000215: Invalid client secret provided.")
-        )
-        assertTrue(aadstsSecretMsg?.contains("Client Secret Value", ignoreCase = true) == true)
-
-        val cancelledResult = repo.mapMicrosoftAuthError(
-            FirebaseAuthWebException("ERROR_WEB_CONTEXT_CANCELED", "The web operation was canceled by the user.")
-        )
-        assertNull(cancelledResult)
-    }
-
-    @Test
-    fun signInScreen_opensMicrosoftSetupGuideDialog_fromButtonAndErrorAction() {
-        composeRule.setContent {
-            SATMessengerTheme {
-                SignInScreen(
-                    authState = AuthUiState.Error("Microsoft Sign-In is not enabled yet in Firebase Console."),
-                    onGoogleSignInClick = {},
-                    onMicrosoftSignInClick = {}
-                )
-            }
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag("error_card_action_button").performScrollTo().performClick()
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag("microsoft_setup_dialog").assertIsDisplayed()
-        composeRule.onNodeWithText(AuthRepository.FIREBASE_REDIRECT_URI).assertIsDisplayed()
-        composeRule.onNodeWithTag("copy_redirect_uri_button").assertIsDisplayed()
-        composeRule.onNodeWithTag("close_microsoft_setup_dialog").performClick()
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag("microsoft_setup_help_button").performScrollTo().performClick()
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag("microsoft_setup_dialog").assertIsDisplayed()
     }
 
     @Test
@@ -210,7 +126,6 @@ class SignInScreenAndAuthTest {
                 SignInScreen(
                     authState = AuthUiState.Unauthenticated,
                     onGoogleSignInClick = {},
-                    onMicrosoftSignInClick = {},
                     onOpenManual = { openManualClicks++ }
                 )
             }
@@ -228,8 +143,7 @@ class SignInScreenAndAuthTest {
             SATMessengerTheme {
                 SignInScreen(
                     authState = AuthUiState.Unauthenticated,
-                    onGoogleSignInClick = {},
-                    onMicrosoftSignInClick = {}
+                    onGoogleSignInClick = {}
                 )
             }
         }
@@ -239,6 +153,6 @@ class SignInScreenAndAuthTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("SAT Messenger Manual").assertIsDisplayed()
-        composeRule.onNodeWithText("Registration & Sign-In (Google & Microsoft)").assertIsDisplayed()
+        composeRule.onNodeWithText("Registration & Sign-In (Google)").assertIsDisplayed()
     }
 }

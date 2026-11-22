@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -114,6 +115,7 @@ fun MessageBubble(
     onReport: () -> Unit = {},
     onReact: (String) -> Unit = {},
     onImageClick: ((String) -> Unit)? = null,
+    onVideoClick: ((String) -> Unit)? = null,
     onFileClick: ((Message) -> Unit)? = null,
     audioPlaybackState: VoicePlaybackState = VoicePlaybackState(),
     onToggleAudioPlay: ((Message) -> Unit)? = null,
@@ -292,6 +294,74 @@ fun MessageBubble(
                                     .fillMaxWidth()
                                     .height(180.dp)
                             )
+                        }
+                    }
+
+                    // Rich Media: Video Clip Attachment
+                    if (message.type == "video" && !message.attachmentUrl.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isOutgoing) {
+                                Color.Black.copy(alpha = 0.28f)
+                            } else {
+                                Color(0xFF0A2540)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp)
+                                .clickable { onVideoClick?.invoke(message.attachmentUrl) }
+                                .testTag("video_attachment_${message.id}")
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(156.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = SatElectricBlue,
+                                        modifier = Modifier.size(50.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = "Play shared video",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(30.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Videocam,
+                                            contentDescription = null,
+                                            tint = SatTeal,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = message.fileName?.takeIf { it.isNotBlank() } ?: "Video Clip • Tap to Play",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    message.fileSize?.takeIf { it > 0 }?.let { size ->
+                                        Text(
+                                            text = formatBubbleFileSize(size),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White.copy(alpha = 0.75f)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 

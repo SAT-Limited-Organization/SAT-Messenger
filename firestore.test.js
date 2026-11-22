@@ -391,3 +391,220 @@ test("Contacts & Availability: user can sync valid availabilityStatus and manage
   );
 });
 
+test("Group Room Admin Promotion: creator/admin can promote and dismiss admins, non-admin and creator demotion denied", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("chatRooms").doc("room_admins").set({
+      id: "room_admins",
+      name: "Mission Control",
+      memberIds: [ALICE_UID, BOB_UID, CHARLIE_UID],
+      adminIds: [ALICE_UID],
+      createdBy: ALICE_UID,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const charlieDb = testEnv.authenticatedContext(CHARLIE_UID).firestore();
+
+  // Non-admin Bob cannot promote himself
+  await assertFails(
+    bobDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Creator Alice promotes Bob to admin
+  await assertSucceeds(
+    aliceDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Promoted Admin Bob cannot remove Creator Alice from adminIds
+  await assertFails(
+    bobDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Promoted Admin Bob can promote Charlie
+  await assertSucceeds(
+    bobDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [ALICE_UID, BOB_UID, CHARLIE_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Creator Alice can dismiss Bob back to standard member
+  await assertSucceeds(
+    aliceDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [ALICE_UID, CHARLIE_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Demoted Bob can no longer alter adminIds
+  await assertFails(
+    bobDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [ALICE_UID, BOB_UID, CHARLIE_UID],
+      updatedAt: new Date(),
+    })
+  );
+  // Existing admin Charlie can still manage admins
+  await assertSucceeds(
+    charlieDb.collection("chatRooms").doc("room_admins").update({
+      adminIds: [ALICE_UID],
+      updatedAt: new Date(),
+    })
+  );
+});
+
+test("Channel Admin Promotion: creator/admin can update adminIds, creator stays protected, non-admin denied", async () => {
+  const createdAt = new Date();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("channels").doc("chan_admins").set({
+      id: "chan_admins",
+      name: "Engineering Dispatch",
+      category: "Engineering",
+      isPublic: true,
+      allowFollowerPosts: false,
+      allowReactions: true,
+      creatorId: ALICE_UID,
+      adminIds: [ALICE_UID],
+      subscriberIds: [ALICE_UID, BOB_UID],
+      followerCount: 2,
+      createdAt,
+      updatedAt: createdAt,
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+
+  // Follower Bob cannot promote himself
+  await assertFails(
+    bobDb.collection("channels").doc("chan_admins").update({
+      adminIds: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Creator Alice promotes Bob to Channel Admin
+  await assertSucceeds(
+    aliceDb.collection("channels").doc("chan_admins").update({
+      adminIds: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Admin Bob cannot demote Creator Alice
+  await assertFails(
+    bobDb.collection("channels").doc("chan_admins").update({
+      adminIds: [BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Creator Alice can dismiss Bob
+  await assertSucceeds(
+    aliceDb.collection("channels").doc("chan_admins").update({
+      adminIds: [ALICE_UID],
+      updatedAt: new Date(),
+    })
+  );
+});
+
+test("Community Admin Promotion: creator/admin can promote/dismiss admins, non-admin and creator removal denied", async () => {
+  const createdAt = new Date();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("communities").doc("comm_admins").set({
+      id: "comm_admins",
+      name: "SAT Orbital Ops",
+      creatorId: ALICE_UID,
+      adminIds: [ALICE_UID],
+      memberIds: [ALICE_UID, BOB_UID],
+      subgroupChatIds: [],
+      createdAt,
+      updatedAt: createdAt,
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+
+  // Member Bob cannot self-promote
+  await assertFails(
+    bobDb.collection("communities").doc("comm_admins").update({
+      adminIds: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Creator Alice promotes Bob
+  await assertSucceeds(
+    aliceDb.collection("communities").doc("comm_admins").update({
+      adminIds: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Promoted Admin Bob cannot remove Creator Alice
+  await assertFails(
+    bobDb.collection("communities").doc("comm_admins").update({
+      adminIds: [BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Creator Alice dismisses Bob
+  await assertSucceeds(
+    aliceDb.collection("communities").doc("comm_admins").update({
+      adminIds: [ALICE_UID],
+      updatedAt: new Date(),
+    })
+  );
+});
+
+test("Video media messages: chat member can send type video attachment, non-member denied", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const charlieDb = testEnv.authenticatedContext(CHARLIE_UID).firestore();
+
+  await assertSucceeds(
+    aliceDb.collection("chats").doc("chat_video").collection("messages").doc("vid_1").set({
+      id: "vid_1",
+      chatId: "chat_video",
+      senderId: ALICE_UID,
+      senderName: "Alice",
+      text: "Flight telemetry video",
+      type: "video",
+      attachmentUrl: "data:video/mp4;base64,AAAAIGZ0eXBpc29t",
+      fileName: "telemetry_clip.mp4",
+      fileSize: 4096,
+      memberIds: [ALICE_UID, BOB_UID],
+      status: "sent",
+      deleted: false,
+      createdAt: new Date(),
+    })
+  );
+
+  await assertFails(
+    charlieDb.collection("chats").doc("chat_video").collection("messages").doc("vid_2").set({
+      id: "vid_2",
+      chatId: "chat_video",
+      senderId: CHARLIE_UID,
+      senderName: "Charlie",
+      text: "Unauthorized video",
+      type: "video",
+      attachmentUrl: "data:video/mp4;base64,AAAAIGZ0eXBpc29t",
+      memberIds: [ALICE_UID, BOB_UID],
+      createdAt: new Date(),
+    })
+  );
+});
+
+

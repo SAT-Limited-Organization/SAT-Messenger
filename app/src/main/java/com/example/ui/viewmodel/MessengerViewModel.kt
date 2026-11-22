@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.AvailabilityStatus
@@ -16,15 +17,19 @@ import com.example.data.model.Message
 import com.example.data.model.PrivacySettings
 import com.example.data.model.StatusItem
 import com.example.data.model.UserProfile
-import com.example.data.repository.AuthProvider
 import com.example.data.repository.AuthRepository
 import com.example.data.repository.AuthUiState
 import com.example.data.repository.ChatRepository
 import com.example.data.repository.InviteRepository
+import com.example.data.repository.SatAiMessage
+import com.example.data.repository.SatAiMode
+import com.example.data.repository.SatAiRepository
+import com.example.data.repository.SatAiUiState
 import com.example.data.repository.SocialFeaturesRepository
 import com.example.data.repository.UserRepository
 import com.example.notifications.AppNotificationManager
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,12 +39,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 enum class ScreenState {
     CHATS,
     CONVERSATION,
     PROFILE,
-    MANUAL
+    MANUAL,
+    SAT_AI
 }
 
 class MessengerViewModel(
@@ -49,16 +56,13 @@ class MessengerViewModel(
     private val chatRepository: ChatRepository = ChatRepository(context),
     private val socialRepository: SocialFeaturesRepository = SocialFeaturesRepository(context),
     private val inviteRepository: InviteRepository = InviteRepository(context),
-    private val appNotificationManager: AppNotificationManager = AppNotificationManager(context)
+    private val appNotificationManager: AppNotificationManager = AppNotificationManager(context),
+    private val satAiRepository: SatAiRepository = SatAiRepository()
 ) : ViewModel() {
 
     private val notificationPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     val authState: StateFlow<AuthUiState> = authRepository.authState
-    val activeAuthProvider: StateFlow<AuthProvider?> = authRepository.activeProvider
-
-    private val _linkedProviderIds = MutableStateFlow<List<String>>(emptyList())
-    val linkedProviderIds: StateFlow<List<String>> = _linkedProviderIds.asStateFlow()
 
     private val _currentScreen = MutableStateFlow(ScreenState.CHATS)
     val currentScreen: StateFlow<ScreenState> = _currentScreen.asStateFlow()
@@ -165,10 +169,24 @@ class MessengerViewModel(
     private val _isJoiningInvite = MutableStateFlow(false)
     val isJoiningInvite: StateFlow<Boolean> = _isJoiningInvite.asStateFlow()
 
+    // SAT Limited AI states
+    private val _satAiMessages = MutableStateFlow<List<SatAiMessage>>(emptyList())
+    val satAiMessages: StateFlow<List<SatAiMessage>> = _satAiMessages.asStateFlow()
+
+    private val _satAiUiState = MutableStateFlow<SatAiUiState>(SatAiUiState.Idle)
+    val satAiUiState: StateFlow<SatAiUiState> = _satAiUiState.asStateFlow()
+
+    private val _satAiMode = MutableStateFlow(SatAiMode.SMART)
+    val satAiMode: StateFlow<SatAiMode> = _satAiMode.asStateFlow()
+
+    private val _satAiWebGroundingEnabled = MutableStateFlow(true)
+    val satAiWebGroundingEnabled: StateFlow<Boolean> = _satAiWebGroundingEnabled.asStateFlow()
+
     private var messagesJob: Job? = null
     private var chatsJob: Job? = null
     private var profileJob: Job? = null
     private var activeChatJob: Job? = null
+    private var satAiJob: Job? = null
     private val chatMessageListeners = mutableMapOf<String, Job>()
 
     init {
@@ -195,7 +213,6 @@ class MessengerViewModel(
         val displayName = user.displayName?.takeIf { it.isNotBlank() }
             ?: resolvedEmail.substringBefore("@").takeIf { it.isNotBlank() }
             ?: "SAT Member"
-        _linkedProviderIds.value = authRepository.getLinkedProviderIds()
 
         // Setup or sync profile presence in Firestore
         viewModelScope.launch {
@@ -224,6 +241,12 @@ class MessengerViewModel(
         chatsJob = viewModelScope.launch {
             chatRepository.observeUserChats(uid).collectLatest { list ->
                 _chats.value = list
+                val activeId = _activeChat.value?.id
+                if (activeId != null) {
+                    list.firstOrNull { it.id == activeId }?.let { updated ->
+                        _activeChat.value = updated
+                    }
+                }
 
                 // Open pending chat from notification tap if available
                 val pendingId = _pendingNotificationChatId.value
@@ -277,6 +300,7 @@ class MessengerViewModel(
                                 ) {
                                     val preview = when (latest.type) {
                                         "image" -> if (latest.text.isNotBlank()) "📷 ${latest.text}" else "📷 Photo"
+                                        "video" -> if (latest.text.isNotBlank()) "🎥 ${latest.text}" else "🎥 Video clip"
                                         "file" -> "📎 ${latest.fileName ?: "Document"}"
                                         "audio" -> "🎤 Voice message"
                                         else -> latest.text
@@ -373,11 +397,11 @@ class MessengerViewModel(
     }
 
     private fun onUserSignedOut() {
-        _linkedProviderIds.value = emptyList()
         messagesJob?.cancel()
         chatsJob?.cancel()
         profileJob?.cancel()
         activeChatJob?.cancel()
+        satAiJob?.cancel()
         chatMessageListeners.values.forEach { it.cancel() }
         chatMessageListeners.clear()
         notifiedMessageIds.clear()
@@ -395,6 +419,8 @@ class MessengerViewModel(
         _activeInviteDialogLink.value = null
         _showJoinInviteDialog.value = false
         _pendingInvitePreview.value = null
+        _satAiMessages.value = emptyList()
+        _satAiUiState.value = SatAiUiState.Idle
         _currentScreen.value = ScreenState.CHATS
     }
 
@@ -404,28 +430,8 @@ class MessengerViewModel(
         }
     }
 
-    fun signInWithMicrosoft(activity: Activity) {
-        authRepository.signInWithMicrosoft(activity, viewModelScope) { err ->
-            _toastMessage.value = err
-        }
-    }
-
     fun clearAuthError() {
         authRepository.clearError()
-    }
-
-    fun linkMicrosoftAccount(activity: Activity) {
-        authRepository.linkMicrosoftAccount(
-            activity = activity,
-            scope = viewModelScope,
-            onSuccess = {
-                _linkedProviderIds.value = authRepository.getLinkedProviderIds()
-                _toastMessage.value = "Microsoft account linked successfully."
-            },
-            onError = { err ->
-                _toastMessage.value = err
-            }
-        )
     }
 
     fun signOut() {
@@ -1172,6 +1178,133 @@ class MessengerViewModel(
                 authRepository.signOut(viewModelScope)
             } else {
                 _toastMessage.value = "Account deletion failed."
+            }
+        }
+    }
+
+    fun setGroupAdminRole(chatId: String, targetUserId: String, makeAdmin: Boolean) {
+        viewModelScope.launch {
+            val result = chatRepository.setGroupAdminRole(chatId, targetUserId, makeAdmin)
+            result.onSuccess {
+                _toastMessage.value = if (makeAdmin) {
+                    "Member promoted to Group Admin."
+                } else {
+                    "Group Admin role removed."
+                }
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update group admin role."
+            }
+        }
+    }
+
+    fun setChannelAdminRole(channelId: String, targetUserId: String, makeAdmin: Boolean) {
+        viewModelScope.launch {
+            val result = socialRepository.setChannelAdminRole(channelId, targetUserId, makeAdmin)
+            result.onSuccess {
+                _toastMessage.value = if (makeAdmin) {
+                    "Member promoted to Channel Admin."
+                } else {
+                    "Channel Admin role removed."
+                }
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update channel admin role."
+            }
+        }
+    }
+
+    fun setCommunityAdminRole(communityId: String, targetUserId: String, makeAdmin: Boolean) {
+        viewModelScope.launch {
+            val result = socialRepository.setCommunityAdminRole(communityId, targetUserId, makeAdmin)
+            result.onSuccess {
+                _toastMessage.value = if (makeAdmin) {
+                    "Member promoted to Community Admin."
+                } else {
+                    "Community Admin role removed."
+                }
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update community admin role."
+            }
+        }
+    }
+
+    // SAT Limited AI Actions
+    fun openSatAi() {
+        _currentScreen.value = ScreenState.SAT_AI
+    }
+
+    fun setSatAiMode(mode: SatAiMode) {
+        _satAiMode.value = mode
+    }
+
+    fun setSatAiWebGrounding(enabled: Boolean) {
+        _satAiWebGroundingEnabled.value = enabled
+    }
+
+    fun dismissSatAiError() {
+        if (_satAiUiState.value is SatAiUiState.Error) {
+            _satAiUiState.value = SatAiUiState.Idle
+        }
+    }
+
+    fun clearSatAiConversation() {
+        satAiJob?.cancel()
+        _satAiMessages.value = emptyList()
+        _satAiUiState.value = SatAiUiState.Idle
+    }
+
+    fun sendSatAiPrompt(
+        prompt: String,
+        attachedImage: Bitmap? = null,
+        attachmentPreviewUri: String? = null
+    ) {
+        val trimmed = prompt.trim()
+        if (trimmed.isBlank() && attachedImage == null) return
+
+        val priorHistory = _satAiMessages.value
+        val displayPrompt = trimmed.ifBlank { "Analyze attached image" }
+        val userMessage = SatAiMessage(
+            id = UUID.randomUUID().toString(),
+            role = "user",
+            text = displayPrompt,
+            attachmentPreviewUri = attachmentPreviewUri
+        )
+
+        val selectedMode = _satAiMode.value
+        val groundingEnabled = _satAiWebGroundingEnabled.value
+        _satAiMessages.value = priorHistory + userMessage
+        _satAiUiState.value = SatAiUiState.Loading
+
+        satAiJob?.cancel()
+        satAiJob = viewModelScope.launch {
+            try {
+                val result = satAiRepository.sendMessageStreaming(
+                    historyMessages = priorHistory,
+                    userPrompt = trimmed,
+                    attachedImage = attachedImage,
+                    mode = selectedMode,
+                    webGroundingEnabled = groundingEnabled,
+                    onPartialText = { partial ->
+                        _satAiUiState.value = SatAiUiState.Streaming(partial)
+                    }
+                )
+                result.onSuccess { response ->
+                    val aiMessage = SatAiMessage(
+                        id = UUID.randomUUID().toString(),
+                        role = "model",
+                        text = response.fullText,
+                        modelLabel = selectedMode.label,
+                        webSearchQueries = response.webSearchQueries,
+                        groundingSources = response.groundingSources
+                    )
+                    _satAiMessages.value = _satAiMessages.value + aiMessage
+                    _satAiUiState.value = SatAiUiState.Success
+                }.onFailure { err ->
+                    val message = err.localizedMessage?.takeIf { it.isNotBlank() }
+                        ?: "SAT Limited AI could not complete the request. Please verify connectivity and try again."
+                    _satAiUiState.value = SatAiUiState.Error(message)
+                }
+            } catch (e: CancellationException) {
+                throw e
             }
         }
     }

@@ -1,5 +1,7 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.File
 import java.time.Duration
+import java.util.Base64
 
 plugins {
   alias(libs.plugins.android.application)
@@ -17,8 +19,8 @@ android {
     applicationId = "com.aistudio.satmessenger.satlim"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.2.07.11.2026.14.5.0"
+    versionCode = 2
+    versionName = "1.3.2.07.11.2026.14.5.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -146,4 +148,70 @@ tasks.withType<Test> {
   testLogging {
     events("passed", "failed", "skipped")
   }
+}
+
+val debugKeystoreFile = rootProject.layout.projectDirectory.file("debug.keystore").asFile
+val debugKeystoreBase64File = rootProject.layout.projectDirectory.file("debug.keystore.base64").asFile
+val debugKeystoreEnvProvider = providers.environmentVariable("DEBUG_KEYSTORE_BASE64")
+val javaHomeProvider = providers.systemProperty("java.home")
+
+val ensureDebugKeystore by tasks.registering {
+  description = "Ensures root debug.keystore exists and is readable before validateSigningDebug."
+  group = "build setup"
+  val outFile = debugKeystoreFile
+  val b64File = debugKeystoreBase64File
+  val envB64 = debugKeystoreEnvProvider
+  val javaHome = javaHomeProvider
+
+  onlyIf { !outFile.exists() || !outFile.canRead() }
+
+  doLast {
+    if (!outFile.exists()) {
+      outFile.parentFile?.mkdirs()
+      val envPayload = envB64.orNull?.trim().orEmpty()
+      val decodedBytes: ByteArray? = when {
+        envPayload.isNotEmpty() -> Base64.getMimeDecoder().decode(envPayload)
+        b64File.exists() -> Base64.getMimeDecoder().decode(b64File.readText().trim())
+        else -> null
+      }
+      if (decodedBytes != null && decodedBytes.isNotEmpty()) {
+        outFile.writeBytes(decodedBytes)
+      } else {
+        val homeDir = javaHome.orNull.orEmpty()
+        val keytoolExe = if (System.getProperty("os.name").lowercase().contains("win")) "keytool.exe" else "keytool"
+        val resolvedKeytool = if (homeDir.isNotEmpty()) {
+          val candidate = File("$homeDir/bin/$keytoolExe")
+          if (candidate.exists()) candidate.absolutePath else keytoolExe
+        } else {
+          keytoolExe
+        }
+        val process = ProcessBuilder(
+          resolvedKeytool,
+          "-genkeypair",
+          "-v",
+          "-keystore", outFile.absolutePath,
+          "-storepass", "android",
+          "-alias", "androiddebugkey",
+          "-keypass", "android",
+          "-keyalg", "RSA",
+          "-keysize", "2048",
+          "-validity", "10000",
+          "-dname", "CN=Android Debug,O=Android,C=US"
+        ).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().readText()
+        val exitCode = process.waitFor()
+        if (exitCode != 0 || !outFile.exists()) {
+          throw GradleException("Failed to generate debug.keystore via keytool (exit $exitCode): $output")
+        }
+      }
+    }
+    if (!outFile.setReadable(true, false)) {
+      logger.warn("Unable to update read permissions on ${outFile.absolutePath}")
+    }
+    outFile.setWritable(true, true)
+  }
+}
+
+tasks.matching { it.name == "validateSigningDebug" }.configureEach {
+  dependsOn(ensureDebugKeystore)
 }

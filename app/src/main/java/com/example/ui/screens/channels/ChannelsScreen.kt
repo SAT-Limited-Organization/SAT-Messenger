@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +36,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -87,9 +89,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.heightIn
 import coil.compose.AsyncImage
 import com.example.data.model.Channel
 import com.example.data.model.ChannelPost
+import com.example.data.model.UserProfile
+import com.example.ui.components.UserAvatar
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
@@ -572,6 +577,7 @@ fun ChannelFeedDialog(
     channel: Channel,
     currentUserId: String,
     posts: List<ChannelPost>,
+    directoryUsers: List<UserProfile> = emptyList(),
     onDismiss: () -> Unit,
     onToggleFollow: (Channel) -> Unit = {},
     onPostMessage: (text: String, mediaUrl: String?) -> Unit,
@@ -584,6 +590,7 @@ fun ChannelFeedDialog(
         allowFollowerPosts: Boolean,
         allowReactions: Boolean
     ) -> Unit = { _, _, _, _, _, _ -> },
+    onToggleChannelAdmin: (targetUserId: String, makeAdmin: Boolean) -> Unit = { _, _ -> },
     onDeleteChannel: () -> Unit = {},
     onShareInvite: () -> Unit = {},
     onReact: (postId: String, reactions: Map<String, Int>, emoji: String) -> Unit
@@ -597,6 +604,7 @@ fun ChannelFeedDialog(
     var newPostText by remember { mutableStateOf("") }
     var attachedImageBase64 by remember { mutableStateOf<String?>(null) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showAdminsDialog by remember { mutableStateOf(false) }
     var fullScreenImage by remember { mutableStateOf<String?>(null) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -611,6 +619,7 @@ fun ChannelFeedDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 @OptIn(ExperimentalMaterial3Api::class)
@@ -646,6 +655,12 @@ fun ChannelFeedDialog(
                             Icon(imageVector = Icons.Default.Share, contentDescription = "Share Invite Link", tint = SatElectricBlue)
                         }
                         if (isAdmin) {
+                            IconButton(
+                                onClick = { showAdminsDialog = true },
+                                modifier = Modifier.testTag("channel_manage_admins_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.AdminPanelSettings, contentDescription = "Manage Channel Admins", tint = SatElectricBlue)
+                            }
                             IconButton(
                                 onClick = { showSettingsDialog = true },
                                 modifier = Modifier.testTag("channel_feed_settings_button")
@@ -959,6 +974,27 @@ fun ChannelFeedDialog(
                 }
             }
         }
+
+            if (showAdminsDialog) {
+                BackHandler { showAdminsDialog = false }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clickable { showAdminsDialog = false }
+                        .padding(20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ChannelAdminsCard(
+                        channel = channel,
+                        currentUserId = currentUserId,
+                        directoryUsers = directoryUsers,
+                        onToggleAdmin = onToggleChannelAdmin,
+                        onDismiss = { showAdminsDialog = false }
+                    )
+                }
+            }
+        }
     }
 
     if (showSettingsDialog) {
@@ -969,6 +1005,10 @@ fun ChannelFeedDialog(
             onSave = { name, desc, cat, isPublic, allowFollowerPosts, allowReactions ->
                 onUpdateChannelSettings(name, desc, cat, isPublic, allowFollowerPosts, allowReactions)
                 showSettingsDialog = false
+            },
+            onOpenManageAdmins = {
+                showSettingsDialog = false
+                showAdminsDialog = true
             },
             onDeleteChannel = {
                 showSettingsDialog = false
@@ -1174,6 +1214,7 @@ private fun ChannelSettingsDialog(
         allowFollowerPosts: Boolean,
         allowReactions: Boolean
     ) -> Unit,
+    onOpenManageAdmins: () -> Unit = {},
     onDeleteChannel: () -> Unit
 ) {
     var name by remember(channel.id) { mutableStateOf(channel.name) }
@@ -1301,6 +1342,24 @@ private fun ChannelSettingsDialog(
                     Text("Save Changes")
                 }
 
+                OutlinedButton(
+                    onClick = onOpenManageAdmins,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .testTag("settings_manage_channel_admins_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AdminPanelSettings,
+                        contentDescription = null,
+                        tint = SatElectricBlue,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Manage Channel Admins (${channel.adminIds.size})", fontWeight = FontWeight.Bold)
+                }
+
                 if (isCreator) {
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedButton(
@@ -1379,6 +1438,166 @@ private fun ChannelToggleRow(
             modifier = Modifier.testTag(testTag)
         )
     }
+}
+
+@Composable
+private fun ChannelAdminsCard(
+    channel: Channel,
+    currentUserId: String,
+    directoryUsers: List<UserProfile>,
+    onToggleAdmin: (targetUserId: String, makeAdmin: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val allCandidateIds = remember(channel.creatorId, channel.adminIds, channel.subscriberIds, directoryUsers) {
+        (listOf(channel.creatorId) + channel.adminIds + channel.subscriberIds + directoryUsers.map { it.userId })
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val candidates = remember(allCandidateIds, directoryUsers, searchQuery, currentUserId) {
+        allCandidateIds.map { uid ->
+            directoryUsers.firstOrNull { it.userId == uid } ?: UserProfile(
+                userId = uid,
+                displayName = if (uid == currentUserId) "You" else "SAT Member (${uid.take(6)})"
+            )
+        }.filter { user ->
+            val q = searchQuery.trim()
+            q.isBlank() ||
+                user.displayName.contains(q, ignoreCase = true) ||
+                user.email.contains(q, ignoreCase = true)
+        }
+    }
+    val callerIsAdmin = channel.creatorId == currentUserId || channel.adminIds.contains(currentUserId)
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = false, onClick = {})
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Channel Admins",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${channel.name} • ${channel.adminIds.size} admins",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SatTeal
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search followers or colleagues...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                ) {
+                    items(candidates, key = { it.userId }) { user ->
+                        val isCreator = user.userId == channel.creatorId
+                        val isUserAdmin = isCreator || channel.adminIds.contains(user.userId)
+                        val isFollower = channel.subscriberIds.contains(user.userId)
+                        val canToggle = callerIsAdmin && !isCreator
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            UserAvatar(
+                                name = user.displayName,
+                                avatarUrl = user.avatarUrl,
+                                isOnline = user.isOnline,
+                                size = 40.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (user.userId == currentUserId) "${user.displayName} (You)" else user.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = when {
+                                        isCreator -> "Channel Creator"
+                                        isUserAdmin -> "Channel Admin"
+                                        isFollower -> "Follower"
+                                        else -> user.email.ifBlank { "SAT Colleague" }
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isUserAdmin) SatTeal else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (canToggle) {
+                                TextButton(
+                                    onClick = { onToggleAdmin(user.userId, !isUserAdmin) },
+                                    modifier = Modifier.testTag("toggle_channel_admin_${user.userId}")
+                                ) {
+                                    Text(
+                                        text = if (isUserAdmin) "Dismiss" else "Make Admin",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isUserAdmin) SatErrorRed else SatElectricBlue
+                                    )
+                                }
+                            } else if (isCreator) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = SatTeal.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = "Creator",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SatTeal,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Done")
+                }
+            }
+        }
 }
 
 private fun formatPostTime(date: Date?): String {

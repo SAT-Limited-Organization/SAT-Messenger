@@ -161,9 +161,9 @@ class ContactsScreenAndManualTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag("manual_search_field").performTextInput("Microsoft")
+        composeRule.onNodeWithTag("manual_search_field").performTextInput("Google")
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Registration & Sign-In (Google & Microsoft)").assertIsDisplayed()
+        composeRule.onNodeWithText("Registration & Sign-In (Google)").assertIsDisplayed()
 
         composeRule.onNodeWithTag("manual_search_field").performTextClearance()
         composeRule.onNodeWithTag("manual_search_field").performTextInput("Contacts Sync")
@@ -174,11 +174,22 @@ class ContactsScreenAndManualTest {
         composeRule.onNodeWithTag("manual_search_field").performTextInput("Voice Recording")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Voice Recording & In-Chat Audio Playback").assertIsDisplayed()
-        composeRule.onNodeWithText("Registration & Sign-In (Google & Microsoft)").assertDoesNotExist()
+        composeRule.onNodeWithText("Registration & Sign-In (Google)").assertDoesNotExist()
 
         composeRule.onNodeWithTag("manual_search_field").performTextClearance()
         composeRule.onNodeWithTag("manual_search_field").performTextInput("Channel, Group")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Channel, Group & Community Invite Links").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("manual_search_field").performTextClearance()
+        composeRule.onNodeWithTag("manual_search_field").performTextInput("SAT Limited AI")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("SAT Limited AI Assistant").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("manual_search_field").performTextClearance()
+        composeRule.onNodeWithTag("manual_search_field").performTextInput("Admin Promotion")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Admin Promotion in Groups, Channels & Communities").assertIsDisplayed()
     }
 }
+

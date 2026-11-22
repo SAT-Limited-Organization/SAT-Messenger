@@ -6,7 +6,7 @@
 [![Firebase](https://img.shields.io/badge/Backend-Firebase%20Auth%20%26%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
 [![Version](https://img.shields.io/badge/Version-1.2.07.11.2026.14.5.0-0A2540)](app/build.gradle.kts)
 
-**SAT Messenger** is a native Kotlin and Jetpack Compose enterprise & team messaging application for **SAT Limited**, built on Material Design 3, Firebase Authentication (Google Credential Manager & Microsoft OAuth), and real-time Cloud Firestore synchronization.
+**SAT Messenger** is a native Kotlin and Jetpack Compose enterprise & team messaging application for **SAT Limited**, built on Material Design 3, Firebase Authentication (Google Credential Manager), and real-time Cloud Firestore synchronization.
 
 ---
 
@@ -64,7 +64,7 @@ gradle :app:assembleRelease
 ## Key Features
 
 ### Authentication & Onboarding
-- **Dual Identity Sign-In:** Authenticate with **Google** (Jetpack `CredentialManager` + Firebase Auth) or **Microsoft** (Firebase `OAuthProvider`), with zero-trust account linking in Profile.
+- **Google Identity Sign-In:** Authenticate securely with **Google** (Jetpack `CredentialManager` + Firebase Auth) with automatic Cloud Firestore profile provisioning.
 - **Pre-Auth & In-App Manual:** A synchronized **App Manual & User Guide** is available directly on the Sign-In / Registration screen as well as inside the authenticated app, searchable by feature and category.
 
 ### Contacts & Real-Time Availability
@@ -72,17 +72,23 @@ gradle :app:assembleRelease
 - **Live Availability Statuses:** Broadcast and view `Available`, `Busy`, `Away`, `In a Meeting`, `Do Not Disturb`, and `Offline` (with relative `Last seen` timestamps) across Contacts, Chats, Conversation Headers, and Profile.
 - **Friends & Filtering:** Star/unstar favorite contacts into your private `/users/{userId}/contacts/{contactId}` Friends list, filter by **All**, **Online**, **Friends**, or **Colleagues**, and search by name, `@handle`, email, phone, or availability.
 
-### Messaging, Reactions & Voice Clips
+### SAT Limited AI Assistant
+- **Powered by Firebase AI Logic & App Check:** Conversational AI assistant (`SAT Limited AI`) built directly into the Chats screen with multi-turn context, streaming answers, and zero hardcoded API keys.
+- **Model Modes & Multimodal Input:** Switch between **Smart** (`gemini-3.8-flash`), **Fast** (`gemini-3.5-flash-lite`), and **Reasoning** (`gemini-4-argon`), and attach photos via the Android Photo Picker for multimodal visual Q&A.
+- **Google Search Grounding:** Toggle **Google Search** grounding to enrich answers with live web searches and clickable citation source links.
+
+### Messaging, Reactions, Media & Voice Clips
 - **1-on-1 & Group Chats:** Real-time messages with live typing indicators, read receipts, unread badges, quoted replies, and `MessageBubble` styling for incoming/outgoing bubbles.
 - **Emoji Reactions:** Long-press any message to add or toggle emoji reactions (`👍`, `❤️`, `😂`, `😮`, `😢`, `🙏`, `🔥`, `🎉`, `👏`, `🚀`, plus an extended emoji picker) stored in Firestore.
 - **Voice Recording & Playback:** Record inline audio clips up to 90 seconds using the device microphone (`RECORD_AUDIO` runtime permission), preview before sending, and play/scrub directly inside chat bubbles.
-- **Media & Document Sharing:** Zero-permission Photo Picker image sharing, file/document attachments, full-screen image viewer, and message deletion/chat clearing.
+- **Photo, Video & Document Sharing:** Zero-permission Android Photo Picker (`ImageAndVideo`) and document attachment composer in Chats and Status, full-screen image viewer & inline `VideoView` clip player, and message deletion/chat clearing.
 
-### Flexible Channels, Communities, Invite Links & Status
-- **Flexible Broadcast Channels:** Create public or invite-only channels with customizable categories and toggles for follower posting and post reactions.
-- **Communities:** Group related departmental rooms and an announcements hub under shared communities.
+### Admin Promotion, Flexible Channels, Communities & Status
+- **Admin Promotion (Groups, Channels & Communities):** Creators and existing admins can promote or dismiss fellow members as Admins in **Group Rooms**, **Channels**, and **Communities**—backed by Cloud Firestore security rules that protect creators and prevent privilege escalation.
+- **Flexible Broadcast Channels:** Create public or invite-only channels with customizable categories, follower posting permissions, post reactions, and admin role management.
+- **Communities:** Group related departmental rooms and an announcements hub under shared communities with member/admin delegation.
 - **Shareable Invite Links & Deep Links:** Generate, copy, revoke/reset, and redeem invite codes and `satmessenger://invite/<code>` / `https://satmessenger.app/invite/<code>` links for **Channels**, **Group Rooms**, and **Communities**.
-- **24-Hour Status Updates:** Share text or image status stories with viewer tracking and inline replies.
+- **24-Hour Status Updates:** Share text, photos, or short video clips as status stories with viewer tracking and inline replies.
 
 ### Phone Notification Center Alerts
 - **System Notifications:** Dedicated Android notification channels (`Direct & Group Messages` and `Channels & Alerts`) with runtime `POST_NOTIFICATIONS` permission handling on Android 13+ and deep-link navigation straight into the relevant chat.
@@ -104,11 +110,12 @@ The app follows **MVVM** + **Clean Repository Architecture** with reactive Kotli
 │       ├── audio/                    # VoiceRecorderManager & VoicePlayerManager
 │       ├── data/
 │       │   ├── model/                # Firestore models & AvailabilityStatus
-│       │   └── repository/           # Auth, User, Chat, SocialFeatures & Invite repositories
+│       │   └── repository/           # Auth, User, Chat, SocialFeatures, Invite & SatAi repositories
 │       ├── notifications/            # AppNotificationManager & channels
+│       ├── util/                     # App Check init & MediaAttachmentHelper
 │       └── ui/
 │           ├── components/           # MessageBubble, VoiceComposer, Avatars & Status pills
-│           ├── screens/              # Auth, Chats, Chat/Details, Contacts, Channels, Communities, Status, Profile, Search, Dialogs, Manual
+│           ├── screens/              # AI, Auth, Chats, Chat/Details, Contacts, Channels, Communities, Status, Profile, Search, Dialogs, Manual
 │           ├── theme/                # Material 3 color scheme & typography
 │           └── viewmodel/            # MessengerViewModel
 ├── firebase-blueprint.json           # Firestore schema & security architecture blueprint
@@ -124,9 +131,10 @@ The app follows **MVVM** + **Clean Repository Architecture** with reactive Kotli
 | :--- | :--- |
 | Language & Async | Kotlin `2.2.10`, Coroutines & Flow |
 | UI Framework | Jetpack Compose (BOM `2024.09.00`), Material Design 3 |
-| Authentication | Firebase Auth, Jetpack `CredentialManager`, Google Identity, Microsoft OAuth |
+| AI & Grounding | Firebase AI Logic (`firebase-ai`), Firebase App Check, Google Search Grounding |
+| Authentication | Firebase Auth, Jetpack `CredentialManager`, Google Identity |
 | Cloud Database | Cloud Firestore with real-time snapshot listeners & server timestamps |
-| Media & Audio | Coil Compose `2.7.0`, Android Photo Picker, `MediaRecorder` / `MediaPlayer` |
+| Media & Audio | Coil Compose `2.7.0`, Android Photo Picker (Image & Video), `VideoView`, `MediaRecorder` / `MediaPlayer` |
 | Testing | JUnit 4, Robolectric `4.16.1`, Compose UI Test, Firebase Auth & Firestore Emulators |
 
 ---
@@ -158,11 +166,5 @@ firebase emulators:exec --only auth,firestore --project demo-no-project \
 ## Configuration Notes
 
 - **Firebase:** Client configuration is stored in `app/google-services.json` (project `sat-limited`). Deploy rule updates with `firebase deploy --only firestore:rules`.
-- **Microsoft Sign-In (Firebase Auth + Microsoft Entra ID):** The Android client requests `openid`, `profile`, `email`, and `User.Read` scopes against tenant `common` (configurable via `microsoft_tenant_id` in `app/src/main/res/values/strings.xml`). To enable it on the backend:
-  1. In **Microsoft Entra ID (Azure Portal)** -> **App registrations** -> **New registration**, create an app supporting organizational & personal accounts (matching `common`, or set your organization's directory GUID in `microsoft_tenant_id`).
-  2. Under **Authentication** -> **Add a platform** -> **Web**, add the Firebase Auth callback URI:  
-     `https://sat-limited.firebaseapp.com/__/auth/handler`
-  3. Under **Certificates & secrets**, create a new client secret and copy its **Value** along with the **Application (client) ID**.
-  4. In **Firebase Console** (`sat-limited`) -> **Authentication** -> **Sign-in method** -> **Microsoft**, toggle **Enable** and paste the Application ID and Client Secret.
 - **Release Signing:** Configure `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` environment variables or CI secrets when building a Play-signed release APK/AAB (`gradle :app:assembleRelease`).
 - **Secrets:** Environment keys belong in AI Studio's **Secrets** panel (mapped via `.env.example`), never hardcoded in source files.

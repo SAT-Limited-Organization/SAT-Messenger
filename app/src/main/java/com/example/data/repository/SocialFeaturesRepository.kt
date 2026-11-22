@@ -434,4 +434,105 @@ class SocialFeaturesRepository(private val db: FirebaseFirestore) {
             Result.failure(e)
         }
     }
+
+    suspend fun setChannelAdminRole(
+        channelId: String,
+        targetUserId: String,
+        makeAdmin: Boolean
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val path = "channels/$channelId"
+        return try {
+            val docRef = db.collection("channels").document(channelId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalArgumentException("Channel not found."))
+            }
+            val creatorId = snapshot.getString("creatorId").orEmpty()
+            val adminIds = (snapshot.get("adminIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val subscriberIds = (snapshot.get("subscriberIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
+            val callerIsAdmin = uid == creatorId || adminIds.contains(uid)
+            if (!callerIsAdmin) {
+                return Result.failure(IllegalStateException("Only channel admins can manage admin roles."))
+            }
+            if (!makeAdmin && targetUserId == creatorId) {
+                return Result.failure(IllegalStateException("Channel creator cannot be demoted from admin."))
+            }
+
+            val updatedAdmins = if (makeAdmin) {
+                (adminIds + targetUserId + creatorId).filter { it.isNotBlank() }.distinct()
+            } else {
+                (adminIds.filterNot { it == targetUserId } + creatorId).filter { it.isNotBlank() }.distinct()
+            }
+            val updatedSubscribers = if (makeAdmin && !subscriberIds.contains(targetUserId)) {
+                subscriberIds + targetUserId
+            } else {
+                subscriberIds
+            }
+
+            docRef.update(
+                mapOf(
+                    "adminIds" to updatedAdmins,
+                    "subscriberIds" to updatedSubscribers,
+                    "followerCount" to updatedSubscribers.size,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun setCommunityAdminRole(
+        communityId: String,
+        targetUserId: String,
+        makeAdmin: Boolean
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val path = "communities/$communityId"
+        return try {
+            val docRef = db.collection("communities").document(communityId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalArgumentException("Community not found."))
+            }
+            val creatorId = snapshot.getString("creatorId").orEmpty()
+            val adminIds = (snapshot.get("adminIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val memberIds = (snapshot.get("memberIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
+            val callerIsAdmin = uid == creatorId || adminIds.contains(uid)
+            if (!callerIsAdmin) {
+                return Result.failure(IllegalStateException("Only community admins can manage admin roles."))
+            }
+            if (!makeAdmin && targetUserId == creatorId) {
+                return Result.failure(IllegalStateException("Community creator cannot be demoted from admin."))
+            }
+
+            val updatedAdmins = if (makeAdmin) {
+                (adminIds + targetUserId + creatorId).filter { it.isNotBlank() }.distinct()
+            } else {
+                (adminIds.filterNot { it == targetUserId } + creatorId).filter { it.isNotBlank() }.distinct()
+            }
+            val updatedMembers = if (makeAdmin && !memberIds.contains(targetUserId)) {
+                memberIds + targetUserId
+            } else {
+                memberIds
+            }
+
+            docRef.update(
+                mapOf(
+                    "adminIds" to updatedAdmins,
+                    "memberIds" to updatedMembers,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
 }

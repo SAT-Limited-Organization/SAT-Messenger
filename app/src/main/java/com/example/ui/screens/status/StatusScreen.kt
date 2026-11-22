@@ -1,6 +1,13 @@
 package com.example.ui.screens.status
 
+import android.net.Uri
+import android.widget.MediaController
 import android.widget.Toast
+import android.widget.VideoView
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -32,7 +39,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,10 +82,12 @@ import coil.compose.AsyncImage
 import com.example.data.model.StatusItem
 import com.example.data.model.UserProfile
 import com.example.ui.components.UserAvatar
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatNavyDark
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatTeal
+import com.example.util.MediaAttachmentHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -101,6 +113,7 @@ fun StatusScreen(
         statuses.filter { it.userId != currentUserId }
     }
 
+    Box(modifier = modifier.fillMaxSize()) {
     Scaffold(
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End) {
@@ -127,7 +140,7 @@ fun StatusScreen(
                 }
             }
         },
-        modifier = modifier
+        modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -334,15 +347,26 @@ fun StatusScreen(
         )
     }
 
-    // Create Status Sheet
+    // Create Status Overlay Sheet
     if (showCreateDialog) {
-        CreateStatusDialog(
-            onDismiss = { showCreateDialog = false },
-            onPost = { text, mediaUrl, bgColor ->
-                onPostStatus(text, mediaUrl, bgColor)
-                showCreateDialog = false
-            }
-        )
+        BackHandler { showCreateDialog = false }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable { showCreateDialog = false }
+                .padding(20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CreateStatusCard(
+                onDismiss = { showCreateDialog = false },
+                onPost = { text, mediaUrl, bgColor ->
+                    onPostStatus(text, mediaUrl, bgColor)
+                    showCreateDialog = false
+                }
+            )
+        }
+    }
     }
 }
 
@@ -380,14 +404,41 @@ private fun StatusStoryViewerDialog(
                 .fillMaxSize()
                 .background(bgColor)
         ) {
-            // Media Image if present
+            // Media Image or Video if present
             if (!status.mediaUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = status.mediaUrl,
-                    contentDescription = "Status Media",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                val viewerContext = LocalContext.current
+                val isVideoMedia = remember(status.mediaUrl) {
+                    MediaAttachmentHelper.isVideoUrlOrMime(status.mediaUrl)
+                }
+                if (isVideoMedia) {
+                    val playableUri = remember(status.mediaUrl) {
+                        MediaAttachmentHelper.resolvePlayableVideoUri(viewerContext, status.mediaUrl)
+                    }
+                    if (playableUri != null) {
+                        AndroidView(
+                            factory = { ctx ->
+                                VideoView(ctx).apply {
+                                    val controller = MediaController(ctx)
+                                    controller.setAnchorView(this)
+                                    setMediaController(controller)
+                                    setVideoURI(playableUri)
+                                    setOnPreparedListener { mp ->
+                                        mp.isLooping = true
+                                        start()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                } else {
+                    AsyncImage(
+                        model = status.mediaUrl,
+                        contentDescription = "Status Media",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -522,25 +573,48 @@ private fun StatusStoryViewerDialog(
 }
 
 @Composable
-private fun CreateStatusDialog(
+private fun CreateStatusCard(
     onDismiss: () -> Unit,
     onPost: (text: String?, mediaUrl: String?, bgColor: String) -> Unit
 ) {
+    val context = LocalContext.current
     var statusText by remember { mutableStateOf("") }
     var mediaUrl by remember { mutableStateOf("") }
+    var pickedMediaDataUrl by remember { mutableStateOf<String?>(null) }
+    var pickedMediaPreviewUri by remember { mutableStateOf<Uri?>(null) }
+    var pickedMediaIsVideo by remember { mutableStateOf(false) }
+    var pickedMediaName by remember { mutableStateOf<String?>(null) }
+
     val colorPresets = listOf("#0A2540", "#008080", "#2E7D32", "#6A1B9A", "#C2185B", "#E65100")
     var selectedColor by remember { mutableStateOf(colorPresets[0]) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+    val mediaPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val encoded = MediaAttachmentHelper.encodeVisualMedia(context, uri)
+            if (encoded.errorMessage != null) {
+                Toast.makeText(context, encoded.errorMessage, Toast.LENGTH_LONG).show()
+            } else {
+                pickedMediaDataUrl = encoded.dataUrlOrUri
+                pickedMediaPreviewUri = uri
+                pickedMediaIsVideo = encoded.type == "video"
+                pickedMediaName = encoded.fileName
+            }
+        }
+    }
+
+    val effectiveMedia = pickedMediaDataUrl?.takeIf { it.isNotBlank() } ?: mediaUrl.trim().takeIf { it.isNotBlank() }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = false, onClick = {})
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -567,13 +641,101 @@ private fun CreateStatusDialog(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(110.dp)
+                        .height(100.dp)
                         .testTag("status_input_text")
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Optional Media URL
+                // Pick Photo or Video from device gallery via zero-permission Photo Picker
+                OutlinedButton(
+                    onClick = {
+                        mediaPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("status_pick_media_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = null,
+                        tint = SatTeal,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Pick Photo or Video")
+                }
+
+                if (pickedMediaPreviewUri != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SatNavyDark)
+                    ) {
+                        if (pickedMediaIsVideo) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Videocam,
+                                    contentDescription = "Selected video",
+                                    tint = SatTeal,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = pickedMediaName ?: "Video Clip Ready",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        } else {
+                            AsyncImage(
+                                model = pickedMediaPreviewUri,
+                                contentDescription = "Selected status photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                pickedMediaDataUrl = null
+                                pickedMediaPreviewUri = null
+                                pickedMediaIsVideo = false
+                                pickedMediaName = null
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(28.dp)
+                                .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                .testTag("status_clear_media_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove selected media",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Optional Media URL fallback
                 OutlinedTextField(
                     value = mediaUrl,
                     onValueChange = { mediaUrl = it },
@@ -581,7 +743,9 @@ private fun CreateStatusDialog(
                     placeholder = { Text("https://example.com/photo.jpg") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("status_media_url_input")
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -595,11 +759,11 @@ private fun CreateStatusDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Color picker
-                LazyRow(
+                Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(colorPresets) { hex ->
+                    colorPresets.forEach { hex ->
                         val color = Color(android.graphics.Color.parseColor(hex))
                         Box(
                             modifier = Modifier
@@ -627,11 +791,11 @@ private fun CreateStatusDialog(
                     onClick = {
                         onPost(
                             statusText.ifBlank { null },
-                            mediaUrl.ifBlank { null },
+                            effectiveMedia,
                             selectedColor
                         )
                     },
-                    enabled = statusText.isNotBlank() || mediaUrl.isNotBlank(),
+                    enabled = statusText.isNotBlank() || !effectiveMedia.isNullOrBlank(),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -641,7 +805,6 @@ private fun CreateStatusDialog(
                 }
             }
         }
-    }
 }
 
 private fun formatStatusTime(date: Date?): String {

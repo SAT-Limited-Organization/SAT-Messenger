@@ -292,6 +292,7 @@ class ChatRepository(private val db: FirebaseFirestore) {
             // Update parent chat snippet
             val previewText = when (type) {
                 "image" -> if (text.isNotBlank()) "📷 $text" else "📷 Photo"
+                "video" -> if (text.isNotBlank()) "🎬 $text" else "🎬 Video"
                 "file" -> if (!fileName.isNullOrBlank()) "📎 $fileName" else if (text.isNotBlank()) "📎 $text" else "📎 Attachment"
                 "audio" -> if (durationSeconds != null && durationSeconds > 0) {
                     val mins = durationSeconds / 60
@@ -428,6 +429,59 @@ class ChatRepository(private val db: FirebaseFirestore) {
                     "lastSenderId" to uid,
                     "lastSenderName" to (auth.currentUser?.displayName ?: "User"),
                     "lastTimestamp" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun setGroupAdminRole(
+        chatId: String,
+        targetUserId: String,
+        makeAdmin: Boolean
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val collection = resolveChatCollection(chatId)
+        val path = "$collection/$chatId"
+        return try {
+            val docRef = db.collection(collection).document(chatId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalArgumentException("Group room not found."))
+            }
+            val memberIds = (snapshot.get("memberIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val adminIds = (snapshot.get("adminIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val createdBy = snapshot.getString("createdBy").orEmpty()
+
+            val callerIsAdmin = uid == createdBy || adminIds.contains(uid)
+            if (!callerIsAdmin) {
+                return Result.failure(IllegalStateException("Only group admins can manage admin roles."))
+            }
+            if (!memberIds.contains(targetUserId)) {
+                return Result.failure(IllegalArgumentException("User is not a member of this group room."))
+            }
+            if (!makeAdmin) {
+                if (createdBy.isNotBlank() && targetUserId == createdBy) {
+                    return Result.failure(IllegalStateException("Group creator cannot be removed as admin."))
+                }
+                if (adminIds.size <= 1 && adminIds.contains(targetUserId)) {
+                    return Result.failure(IllegalStateException("Group must have at least one admin."))
+                }
+            }
+
+            val updatedAdmins = if (makeAdmin) {
+                (adminIds + targetUserId + createdBy).filter { it.isNotBlank() }.distinct()
+            } else {
+                adminIds.filterNot { it == targetUserId }
+            }
+
+            docRef.update(
+                mapOf(
+                    "adminIds" to updatedAdmins,
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()

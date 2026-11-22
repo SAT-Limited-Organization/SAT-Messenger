@@ -7,10 +7,7 @@
     <string name="test_notification_title">SAT Messenger Notifications Active</string>
     <string name="test_notification_body">System notifications are enabled. New incoming messages will appear in your phone Notification Center.</string>
     <string name="sign_in_google">Continue with Google</string>
-    <string name="sign_in_microsoft">Continue with Microsoft</string>
-    <string name="sign_in_or_divider">Enterprise &amp; Personal Identity</string>
     <string name="auth_provider_google">Google</string>
-    <string name="auth_provider_microsoft">Microsoft</string>
     <string name="voice_record_hint">Recording voice note…</string>
     <string name="voice_permission_denied">Microphone permission is required to record voice clips.</string>
     <string name="voice_message_label">Voice message</string>
@@ -18,8 +15,4 @@
     <string name="contacts_title">Contacts &amp; Availability</string>
     <string name="registration_manual_button">App Manual &amp; User Guide</string>
     <string name="registration_manual_subtitle">Learn about sign-in, contacts, chats, voice clips &amp; privacy</string>
-    <string name="microsoft_tenant_id" translatable="false">common</string>
-    <string name="firebase_auth_redirect_uri" translatable="false">https://sat-limited.firebaseapp.com/__/auth/handler</string>
-    <string name="microsoft_setup_help_button">Microsoft Sign-In Setup Guide</string>
-    <string name="microsoft_setup_guide_title">Microsoft Sign-In Setup</string>
 </resources>

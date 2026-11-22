@@ -112,11 +112,14 @@ fun ChatDetailsScreen(
     onDeleteChat: (() -> Unit)? = null,
     onAddParticipants: (() -> Unit)? = null,
     onShareGroupInvite: (() -> Unit)? = null,
+    onToggleGroupAdmin: ((targetUserId: String, makeAdmin: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
     val isGroup = chat.type == "group"
+    val callerCanManageAdmins = isGroup &&
+        (chat.createdBy == currentUserId || chat.adminIds.contains(currentUserId))
 
     val otherMemberId = chat.memberIds.firstOrNull { it != currentUserId }
     val otherUser = directoryUsers.firstOrNull { it.userId == otherMemberId }
@@ -149,10 +152,12 @@ fun ChatDetailsScreen(
     }
 
     val groupMembers = remember(chat.memberIds, directoryUsers, participantSearch) {
-        val members = chat.memberIds.mapNotNull { id ->
-            directoryUsers.firstOrNull { it.userId == id } ?: if (id == currentUserId) {
-                UserProfile(userId = id, displayName = "You", email = "me@satlimited.com")
-            } else null
+        val members = chat.memberIds.map { id ->
+            directoryUsers.firstOrNull { it.userId == id } ?: UserProfile(
+                userId = id,
+                displayName = if (id == currentUserId) "You" else chat.participantNames[id] ?: "User_${id.take(6)}",
+                email = if (id == currentUserId) "me@satlimited.com" else ""
+            )
         }
         if (participantSearch.isBlank()) members
         else members.filter {
@@ -199,6 +204,7 @@ fun ChatDetailsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .testTag("chat_details_lazy_column")
         ) {
             // Hero Header Card
             item {
@@ -564,6 +570,26 @@ fun ChatDetailsScreen(
                                                     )
                                                 }
                                             }
+                                            msg.type == "video" -> {
+                                                Column(
+                                                    modifier = Modifier.align(Alignment.Center),
+                                                    horizontalAlignment = Alignment.CenterHorizontally
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Videocam,
+                                                        contentDescription = "Video clip",
+                                                        tint = SatElectricBlue,
+                                                        modifier = Modifier.size(28.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Video",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                }
+                                            }
                                             msg.type == "file" -> {
                                                 Icon(
                                                     imageVector = Icons.Default.InsertDriveFile,
@@ -607,6 +633,7 @@ fun ChatDetailsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
+                            .testTag("chat_details_group_members_card")
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(
@@ -641,7 +668,13 @@ fun ChatDetailsScreen(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             groupMembers.forEach { member ->
-                                val isAdmin = chat.adminIds.contains(member.userId)
+                                val isCreator = chat.createdBy.isNotBlank() && chat.createdBy == member.userId
+                                val isAdmin = isCreator || chat.adminIds.contains(member.userId)
+                                val canToggleMemberAdmin = callerCanManageAdmins &&
+                                    onToggleGroupAdmin != null &&
+                                    !isCreator &&
+                                    !(member.userId == currentUserId && chat.adminIds.size <= 1)
+
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -672,19 +705,48 @@ fun ChatDetailsScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    if (isAdmin) {
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = SatTeal.copy(alpha = 0.2f)
-                                        ) {
-                                            Text(
-                                                text = "Group Admin",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = SatTeal,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        if (isCreator) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = SatElectricBlue.copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "Creator",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = SatElectricBlue,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.sp,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        } else if (isAdmin) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = SatTeal.copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "Group Admin",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = SatTeal,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.sp,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        if (canToggleMemberAdmin) {
+                                            TextButton(
+                                                onClick = { onToggleGroupAdmin?.invoke(member.userId, !isAdmin) },
+                                                modifier = Modifier.testTag("toggle_group_admin_${member.userId}")
+                                            ) {
+                                                Text(
+                                                    text = if (isAdmin) "Dismiss" else "Make Admin",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isAdmin) SatErrorRed else SatElectricBlue
+                                                )
+                                            }
                                         }
                                     }
                                 }
