@@ -1,6 +1,7 @@
 package com.example.ui.screens.auth
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
@@ -131,6 +132,8 @@ class SignInScreenAndAuthTest {
         val repo = AuthRepository(context)
         val provider = repo.buildMicrosoftProvider()
         assertEquals("microsoft.com", provider.providerId)
+        assertEquals(listOf("openid", "profile", "email", "User.Read"), repo.getMicrosoftScopes())
+        assertEquals("common", repo.getMicrosoftTenantId())
 
         val collisionMsg = repo.mapMicrosoftAuthError(
             FirebaseAuthUserCollisionException("ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL", "exists")
@@ -141,11 +144,60 @@ class SignInScreenAndAuthTest {
             FirebaseAuthException("ERROR_OPERATION_NOT_ALLOWED", "disabled")
         )
         assertTrue(notAllowedMsg?.contains("Firebase Console", ignoreCase = true) == true)
+        assertTrue(notAllowedMsg?.contains(AuthRepository.FIREBASE_REDIRECT_URI) == true)
+
+        val networkMsg = repo.mapMicrosoftAuthError(
+            FirebaseAuthException("ERROR_NETWORK_REQUEST_FAILED", "offline")
+        )
+        assertTrue(networkMsg?.contains("Network error", ignoreCase = true) == true)
+
+        val browserMsg = repo.mapMicrosoftAuthError(
+            ActivityNotFoundException("No browser")
+        )
+        assertTrue(browserMsg?.contains("browser", ignoreCase = true) == true)
+
+        val aadstsRedirectMsg = repo.mapMicrosoftAuthError(
+            IllegalStateException("AADSTS50011: The redirect URI specified in the request does not match.")
+        )
+        assertTrue(aadstsRedirectMsg?.contains(AuthRepository.FIREBASE_REDIRECT_URI) == true)
+
+        val aadstsSecretMsg = repo.mapMicrosoftAuthError(
+            IllegalStateException("AADSTS7000215: Invalid client secret provided.")
+        )
+        assertTrue(aadstsSecretMsg?.contains("Client Secret Value", ignoreCase = true) == true)
 
         val cancelledResult = repo.mapMicrosoftAuthError(
             FirebaseAuthWebException("ERROR_WEB_CONTEXT_CANCELED", "The web operation was canceled by the user.")
         )
         assertNull(cancelledResult)
+    }
+
+    @Test
+    fun signInScreen_opensMicrosoftSetupGuideDialog_fromButtonAndErrorAction() {
+        composeRule.setContent {
+            SATMessengerTheme {
+                SignInScreen(
+                    authState = AuthUiState.Error("Microsoft Sign-In is not enabled yet in Firebase Console."),
+                    onGoogleSignInClick = {},
+                    onMicrosoftSignInClick = {}
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("error_card_action_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("microsoft_setup_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText(AuthRepository.FIREBASE_REDIRECT_URI).assertIsDisplayed()
+        composeRule.onNodeWithTag("copy_redirect_uri_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("close_microsoft_setup_dialog").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("microsoft_setup_help_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("microsoft_setup_dialog").assertIsDisplayed()
     }
 
     @Test

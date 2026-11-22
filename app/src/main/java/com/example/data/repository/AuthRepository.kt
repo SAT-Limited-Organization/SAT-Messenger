@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
@@ -24,11 +25,13 @@ import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 enum class AuthProvider(val providerId: String, val label: String) {
     GOOGLE("google.com", "Google"),
@@ -88,10 +91,21 @@ class AuthRepository(
         }
     }
 
+    internal fun getMicrosoftTenantId(): String {
+        return try {
+            context.getString(R.string.microsoft_tenant_id).trim().ifBlank { DEFAULT_MICROSOFT_TENANT }
+        } catch (_: Exception) {
+            DEFAULT_MICROSOFT_TENANT
+        }
+    }
+
+    internal fun getMicrosoftScopes(): List<String> = MICROSOFT_SCOPES
+
     internal fun buildMicrosoftProvider(): OAuthProvider {
         return OAuthProvider.newBuilder(AuthProvider.MICROSOFT.providerId)
-            .setScopes(listOf("User.Read"))
+            .setScopes(getMicrosoftScopes())
             .addCustomParameter("prompt", "select_account")
+            .addCustomParameter("tenant", getMicrosoftTenantId())
             .build()
     }
 
@@ -281,7 +295,12 @@ class AuthRepository(
         }
         scope.launch {
             try {
-                currentUser.startActivityForLinkWithProvider(activity, buildMicrosoftProvider()).await()
+                val pending = auth.pendingAuthResult
+                if (pending != null) {
+                    pending.await()
+                } else {
+                    currentUser.startActivityForLinkWithProvider(activity, buildMicrosoftProvider()).await()
+                }
                 onSuccess()
             } catch (e: CancellationException) {
                 throw e
@@ -310,21 +329,55 @@ class AuthRepository(
             return null
         }
 
+        if (error is ActivityNotFoundException) {
+            return "No compatible browser or Chrome Custom Tabs provider is installed on this device for Microsoft sign-in."
+        }
+
         return when (error) {
             is FirebaseAuthUserCollisionException ->
                 "An account already exists with this email using Google Sign-In. Please sign in with Google first, then link Microsoft in Profile settings."
             is FirebaseAuthException -> when (error.errorCode) {
                 "ERROR_OPERATION_NOT_ALLOWED" ->
-                    "Microsoft Sign-In is not enabled yet in Firebase Console. Enable the Microsoft provider under Authentication → Sign-in method."
+                    "Microsoft Sign-In is not enabled yet in Firebase Console. Enable Microsoft under Authentication -> Sign-in method (redirect URI: $FIREBASE_REDIRECT_URI)."
                 "ERROR_CREDENTIAL_ALREADY_IN_USE", "ERROR_EMAIL_ALREADY_IN_USE" ->
                     "This Microsoft account is already linked to another SAT Messenger profile."
                 "ERROR_PROVIDER_ALREADY_LINKED" ->
                     "Your Microsoft account is already linked to this profile."
                 "ERROR_USER_DISABLED" ->
                     "This Microsoft account has been disabled by your administrator."
-                else -> error.localizedMessage ?: "Microsoft sign-in failed (${error.errorCode})."
+                "ERROR_NETWORK_REQUEST_FAILED" ->
+                    "Network error while contacting Microsoft or Firebase Authentication. Check your connection and try again."
+                "ERROR_WEB_STORAGE_UNSUPPORTED", "ERROR_WEB_INTERNAL_ERROR" ->
+                    "Browser sign-in failed to initialize. Update Chrome/WebView on this device and try again."
+                "ERROR_INVALID_CREDENTIAL", "ERROR_UNAUTHORIZED_DOMAIN" ->
+                    "Microsoft OAuth configuration mismatch. Verify your Azure Application ID, Client Secret value, and redirect URI ($FIREBASE_REDIRECT_URI) in Firebase Console."
+                else -> mapRawMicrosoftMessage(rawMessage)
+                    ?: error.localizedMessage
+                    ?: "Microsoft sign-in failed (${error.errorCode})."
             }
-            else -> error.localizedMessage ?: "Microsoft sign-in failed. Please try again."
+            else -> mapRawMicrosoftMessage(rawMessage)
+                ?: error.localizedMessage
+                ?: "Microsoft sign-in failed. Please try again."
+        }
+    }
+
+    private fun mapRawMicrosoftMessage(rawMessage: String): String? {
+        if (rawMessage.isBlank()) return null
+        return when {
+            rawMessage.contains("OPERATION_NOT_ALLOWED", ignoreCase = true) ->
+                "Microsoft Sign-In is not enabled yet in Firebase Console. Enable Microsoft under Authentication -> Sign-in method (redirect URI: $FIREBASE_REDIRECT_URI)."
+            rawMessage.contains("redirect_uri", ignoreCase = true) ||
+                rawMessage.contains("AADSTS50011", ignoreCase = true) ->
+                "Microsoft redirect URI mismatch. Add $FIREBASE_REDIRECT_URI under Web Redirect URIs in Azure Portal -> App registrations."
+            rawMessage.contains("invalid_client", ignoreCase = true) ||
+                rawMessage.contains("client_secret", ignoreCase = true) ||
+                rawMessage.contains("AADSTS7000215", ignoreCase = true) ||
+                rawMessage.contains("AADSTS700016", ignoreCase = true) ->
+                "Invalid Microsoft Entra ID Application ID or Client Secret in Firebase Console. Verify the Client Secret Value (not Secret ID) in Firebase Authentication."
+            rawMessage.contains("AADSTS50020", ignoreCase = true) ||
+                rawMessage.contains("tenant", ignoreCase = true) && rawMessage.contains("AADSTS", ignoreCase = true) ->
+                "This Microsoft account does not match the configured Entra ID tenant. Update Supported account types or microsoft_tenant_id in strings.xml."
+            else -> null
         }
     }
 
@@ -332,14 +385,21 @@ class AuthRepository(
         auth.signOut()
         _activeProvider.value = null
         scope.launch {
-            try {
-                credentialManager.clearCredentialState(ClearCredentialStateRequest())
-            } catch (e: Exception) {
-                Log.e("Auth", "Failed to clear credential state", e)
-            } finally {
-                _authState.value = AuthUiState.Unauthenticated
-                onComplete()
+            withContext(NonCancellable) {
+                try {
+                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                } catch (e: Exception) {
+                    Log.e("Auth", "Failed to clear credential state", e)
+                }
             }
+            _authState.value = AuthUiState.Unauthenticated
+            onComplete()
         }
+    }
+
+    companion object {
+        const val DEFAULT_MICROSOFT_TENANT = "common"
+        const val FIREBASE_REDIRECT_URI = "https://sat-limited.firebaseapp.com/__/auth/handler"
+        val MICROSOFT_SCOPES = listOf("openid", "profile", "email", "User.Read")
     }
 }

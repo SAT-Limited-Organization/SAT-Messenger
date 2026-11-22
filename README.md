@@ -153,6 +153,12 @@ firebase emulators:exec --only auth,firestore --project demo-no-project \
 
 ## Configuration Notes
 
-- **Firebase:** Client configuration is stored in `app/google-services.json`. Deploy rule updates with `firebase deploy --only firestore:rules`.
+- **Firebase:** Client configuration is stored in `app/google-services.json` (project `sat-limited`). Deploy rule updates with `firebase deploy --only firestore:rules`.
+- **Microsoft Sign-In (Firebase Auth + Microsoft Entra ID):** The Android client requests `openid`, `profile`, `email`, and `User.Read` scopes against tenant `common` (configurable via `microsoft_tenant_id` in `app/src/main/res/values/strings.xml`). To enable it on the backend:
+  1. In **Microsoft Entra ID (Azure Portal)** -> **App registrations** -> **New registration**, create an app supporting organizational & personal accounts (matching `common`, or set your organization's directory GUID in `microsoft_tenant_id`).
+  2. Under **Authentication** -> **Add a platform** -> **Web**, add the Firebase Auth callback URI:  
+     `https://sat-limited.firebaseapp.com/__/auth/handler`
+  3. Under **Certificates & secrets**, create a new client secret and copy its **Value** along with the **Application (client) ID**.
+  4. In **Firebase Console** (`sat-limited`) -> **Authentication** -> **Sign-in method** -> **Microsoft**, toggle **Enable** and paste the Application ID and Client Secret.
 - **Release Signing:** Configure `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` environment variables or CI secrets when building a Play-signed release APK/AAB (`gradle :app:assembleRelease`).
 - **Secrets:** Environment keys belong in AI Studio's **Secrets** panel (mapped via `.env.example`), never hardcoded in source files.

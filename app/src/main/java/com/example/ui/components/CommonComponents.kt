@@ -300,6 +300,8 @@ fun EmptyStateView(
 fun ErrorCard(
     message: String,
     onDismiss: () -> Unit,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -328,6 +330,21 @@ fun ErrorCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
+                if (actionLabel != null && onAction != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.TextButton(
+                        onClick = onAction,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.testTag("error_card_action_button")
+                    ) {
+                        Text(
+                            text = actionLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
             }
             IconButton(
                 onClick = onDismiss,

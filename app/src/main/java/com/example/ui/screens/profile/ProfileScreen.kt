@@ -74,6 +74,7 @@ import com.example.data.model.BlockedUser
 import com.example.data.model.PrivacySettings
 import com.example.data.model.UserProfile
 import com.example.ui.components.AvailabilityStatusPill
+import com.example.ui.components.MicrosoftSetupGuideDialog
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.availabilityColor
 import com.example.ui.theme.SatElectricBlue
@@ -113,6 +114,7 @@ fun ProfileScreen(
     var readReceipts by remember(privacySettings) { mutableStateOf(privacySettings.readReceipts) }
     var lastSeenVisible by remember(privacySettings) { mutableStateOf(privacySettings.lastSeenVisible) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showMicrosoftSetupDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -630,6 +632,19 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Link Microsoft Account")
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            TextButton(
+                                onClick = { showMicrosoftSetupDialog = true },
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .testTag("profile_microsoft_setup_help_button")
+                            ) {
+                                Text(
+                                    text = "Microsoft Setup Guide",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = SatElectricBlue
+                                )
+                            }
                         }
                     }
                 }
@@ -706,6 +721,12 @@ fun ProfileScreen(
                         Text("Cancel")
                     }
                 }
+            )
+        }
+
+        if (showMicrosoftSetupDialog) {
+            MicrosoftSetupGuideDialog(
+                onDismiss = { showMicrosoftSetupDialog = false }
             )
         }
     }

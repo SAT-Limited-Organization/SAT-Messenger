@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +68,7 @@ import com.example.R
 import com.example.data.repository.AuthProvider
 import com.example.data.repository.AuthUiState
 import com.example.ui.components.ErrorCard
+import com.example.ui.components.MicrosoftSetupGuideDialog
 import com.example.ui.screens.manual.AppManualScreen
 import com.example.ui.theme.GoogleBrandBlue
 import com.example.ui.theme.GoogleBrandGreen
@@ -92,6 +94,7 @@ fun SignInScreen(
 ) {
     val context = LocalContext.current
     var showInlineManual by remember { mutableStateOf(false) }
+    var showMicrosoftSetupDialog by remember { mutableStateOf(false) }
     val isLoading = authState is AuthUiState.Loading
     val isGoogleLoading = isLoading && (activeProvider == AuthProvider.GOOGLE || activeProvider == null)
     val isMicrosoftLoading = isLoading && activeProvider == AuthProvider.MICROSOFT
@@ -339,14 +342,35 @@ fun SignInScreen(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        TextButton(
+                            onClick = { showMicrosoftSetupDialog = true },
+                            modifier = Modifier.testTag("microsoft_setup_help_button")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.microsoft_setup_help_button),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = SatElectricBlue
+                            )
+                        }
                     }
                 }
 
                 if (authState is AuthUiState.Error) {
                     Spacer(modifier = Modifier.height(12.dp))
+                    val isMicrosoftConfigError = authState.message.contains("Microsoft", ignoreCase = true) ||
+                        authState.message.contains("Firebase Console", ignoreCase = true) ||
+                        authState.message.contains("Azure", ignoreCase = true) ||
+                        authState.message.contains("redirect", ignoreCase = true)
                     ErrorCard(
                         message = authState.message,
-                        onDismiss = onDismissError
+                        onDismiss = onDismissError,
+                        actionLabel = if (isMicrosoftConfigError) "View Setup Guide" else null,
+                        onAction = if (isMicrosoftConfigError) {
+                            { showMicrosoftSetupDialog = true }
+                        } else null
                     )
                 }
 
@@ -432,6 +456,12 @@ fun SignInScreen(
                 onBack = { showInlineManual = false }
             )
         }
+    }
+
+    if (showMicrosoftSetupDialog) {
+        MicrosoftSetupGuideDialog(
+            onDismiss = { showMicrosoftSetupDialog = false }
+        )
     }
 }
 

@@ -103,12 +103,14 @@ private val MANUAL_SECTIONS = listOf(
         summary = "Register or sign in to SAT Messenger using either your Google or Microsoft account.",
         steps = listOf(
             "On the Sign-In / Registration screen, choose 'Continue with Google' or 'Continue with Microsoft'.",
-            "Complete authentication with your corporate or personal account; your profile is automatically created and synced to Cloud Firestore on first sign-in.",
-            "You can also link a Microsoft account later from Profile > Sign-In Methods.",
+            "Microsoft Sign-In uses OpenID Connect scopes (openid, profile, email, User.Read) and supports organizational & personal accounts via the configured tenant ('common' by default).",
+            "Complete authentication; your profile is automatically created and synced to Cloud Firestore on first sign-in.",
+            "You can also link a Microsoft account later from Profile > Sign-In Methods or tap 'Microsoft Sign-In Setup Guide' for the Firebase redirect URI.",
             "Need help before signing in? Tap 'App Manual & User Guide' directly on the Registration / Sign-In screen at any time."
         ),
         tips = listOf(
             "Your display name, @username handle, avatar, and real-time availability sync immediately upon registration.",
+            "Workspace admins enabling Microsoft OAuth in Firebase Console use redirect URI https://sat-limited.firebaseapp.com/__/auth/handler.",
             "Anonymous sign-in is disabled to preserve zero-trust security across SAT Limited."
         )
     ),

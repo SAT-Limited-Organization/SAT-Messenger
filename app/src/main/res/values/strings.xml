@@ -18,4 +18,8 @@
     <string name="contacts_title">Contacts &amp; Availability</string>
     <string name="registration_manual_button">App Manual &amp; User Guide</string>
     <string name="registration_manual_subtitle">Learn about sign-in, contacts, chats, voice clips &amp; privacy</string>
+    <string name="microsoft_tenant_id" translatable="false">common</string>
+    <string name="firebase_auth_redirect_uri" translatable="false">https://sat-limited.firebaseapp.com/__/auth/handler</string>
+    <string name="microsoft_setup_help_button">Microsoft Sign-In Setup Guide</string>
+    <string name="microsoft_setup_guide_title">Microsoft Sign-In Setup</string>
 </resources>
