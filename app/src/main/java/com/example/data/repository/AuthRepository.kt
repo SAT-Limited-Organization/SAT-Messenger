@@ -143,9 +143,7 @@ class AuthRepository(
                 _activeProvider.value = null
             }
 
-            val clientId = try {
-                context.getString(R.string.default_web_client_id)
-            } catch (e: Exception) {
+            val clientId = resolveDefaultWebClientId(context) ?: run {
                 _authState.value = AuthUiState.Unauthenticated
                 return@launch
             }
@@ -183,15 +181,23 @@ class AuthRepository(
         }
     }
 
+    @Suppress("DiscouragedApi")
+    internal fun resolveDefaultWebClientId(ctx: Context = context): String? {
+        return try {
+            val resId = ctx.resources.getIdentifier("default_web_client_id", "string", ctx.packageName)
+            if (resId != 0) ctx.getString(resId).trim().ifBlank { null } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun signInWithGoogle(
         activity: Activity,
         scope: CoroutineScope,
         onError: (String) -> Unit = {}
     ) {
-        val clientId = try {
-            activity.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            val err = "Google Sign-In configuration missing: default_web_client_id not found"
+        val clientId = resolveDefaultWebClientId(activity) ?: run {
+            val err = "Google Sign-In configuration missing: add app/google-services.json and rebuild."
             _activeProvider.value = null
             _authState.value = AuthUiState.Error(err)
             onError(err)

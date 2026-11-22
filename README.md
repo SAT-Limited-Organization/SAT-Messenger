@@ -31,12 +31,16 @@
 This repository includes an automated release workflow at [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml). Follow either path below depending on how you deploy:
 
 ### Option 1: Automatic GitHub Release Download Link (Recommended)
-1. **Push the project to GitHub** (from Google AI Studio **Settings -> Push to GitHub**, or using `git push` to `main`).
-2. Once pushed, GitHub Actions automatically runs **Build & Release Android APK** ([`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml)):
-   - Restores the project debug signing keystore (`debug.keystore.base64`).
+1. **Ensure Firebase & Keystore config are available to GitHub Actions:**
+   - Either commit `app/google-services.json` and `debug.keystore.base64` to the repository, **or** add them under **GitHub Repository → Settings → Secrets and variables → Actions**:
+     - `GOOGLE_SERVICES_JSON`: Full JSON (or base64) contents of `app/google-services.json`.
+     - `DEBUG_KEYSTORE_BASE64` *(optional, required for Google Sign-In SHA-1 matching)*: Base64 contents of `debug.keystore.base64` (if omitted, CI generates a fallback debug keystore automatically).
+2. **Push the project to GitHub** (from Google AI Studio **Settings -> Push to GitHub**, or using `git push` to `main`).
+3. Once pushed, GitHub Actions automatically runs **Build & Release Android APK** ([`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml)):
+   - Restores `app/google-services.json` and `debug.keystore`.
    - Compiles the APK via `gradle :app:assembleDebug`.
    - Publishes a GitHub Release tagged `latest` (or the pushed `v*` tag) with **`sat-messenger-debug.apk`** attached.
-3. Copy your live download link from **Releases -> `sat-messenger-debug.apk`** (or update `<OWNER>/<REPO>` in this README to match your repository).
+4. Download the APK directly from **Releases → `sat-messenger-debug.apk`** using the badge link above.
 
 ### Option 2: Generate APK Directly in Google AI Studio
 1. Open the **Settings** menu in Google AI Studio Build.

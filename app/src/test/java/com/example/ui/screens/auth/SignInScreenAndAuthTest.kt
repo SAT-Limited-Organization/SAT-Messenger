@@ -134,6 +134,7 @@ class SignInScreenAndAuthTest {
         assertEquals("microsoft.com", provider.providerId)
         assertEquals(listOf("openid", "profile", "email", "User.Read"), repo.getMicrosoftScopes())
         assertEquals("common", repo.getMicrosoftTenantId())
+        assertTrue(!repo.resolveDefaultWebClientId().isNullOrBlank())
 
         val collisionMsg = repo.mapMicrosoftAuthError(
             FirebaseAuthUserCollisionException("ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL", "exists")
