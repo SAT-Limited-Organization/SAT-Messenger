@@ -14,12 +14,12 @@
 
 > **Important Setup Note:** Replace `<OWNER>/<REPO>` below with your GitHub username and repository name after pushing this project to GitHub. A live download URL is created only after the project is pushed to your GitHub repository and either a GitHub Release is published or the included GitHub Actions workflow completes.
 
-[![Download SAT Messenger APK](https://img.shields.io/badge/Download-SAT%20Messenger%20APK-00BFA5?style=for-the-badge&logo=android&logoColor=white)](https://github.com/<OWNER>/<REPO>/releases/latest/download/sat-messenger-debug.apk)
+[![Download SAT Messenger APK](https://img.shields.io/badge/Download-SAT%20Messenger%20APK-00BFA5?style=for-the-badge&logo=android&logoColor=white)](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk)
 
 - **Direct Release Asset Link (after pushing to GitHub):**  
-  `https://github.com/<OWNER>/<REPO>/releases/latest/download/sat-messenger-debug.apk`
+  `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk`
 - **All GitHub Releases:**  
-  `https://github.com/<OWNER>/<REPO>/releases`
+  `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases`
 - **Application ID:** `com.aistudio.satmessenger.satlim`
 - **Version:** `1.2.07.11.2026.14.5.0` (`versionCode: 1`)
 - **Minimum Android Version:** Android 7.0 (`minSdk 24`, `targetSdk 36`)
