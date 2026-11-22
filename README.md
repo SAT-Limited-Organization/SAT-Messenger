@@ -21,7 +21,7 @@
 - **All GitHub Releases:**  
   `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases`
 - **Application ID:** `com.aistudio.satmessenger.satlim`
-- **Version:** `2.2.07.11.2026.14.5.0` (`versionCode: 1`)
+- **Version:** `2.2.07.11.2026.14.5.0` (`versionCode: 2`)
 - **Minimum Android Version:** Android 7.0 (`minSdk 24`, `targetSdk 36`)
 
 ---
