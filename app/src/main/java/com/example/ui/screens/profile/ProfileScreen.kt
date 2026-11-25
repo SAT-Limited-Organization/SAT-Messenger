@@ -1,6 +1,7 @@
 package com.example.ui.screens.profile
 
 import androidx.activity.compose.BackHandler
+import com.example.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -634,7 +635,16 @@ fun ProfileScreen(
                     Text("Delete Account & Clear Profile")
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "SAT Messenger v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("profile_app_version_text")
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
 

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.DonutLarge
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
@@ -390,6 +391,23 @@ private val MANUAL_SECTIONS = listOf(
         tips = listOf(
             "Compliance reports are logged securely to a restricted Firestore collection."
         )
+    ),
+    ManualSection(
+        id = "downloads_and_updates",
+        category = "Downloads & Updates",
+        title = "Downloads, Updates & Sideloading",
+        icon = Icons.Default.Download,
+        badge = "Distribution",
+        summary = "Install SAT Messenger cleanly from GitHub Releases, Obtainium, Play Store, or verified mirrors.",
+        steps = listOf(
+            "Download the latest APK or AAB directly from the GitHub Releases page (sat-messenger-release.apk for production or sat-messenger-debug.apk for QA).",
+            "When sideloading an APK outside an app store, enable 'Install unknown apps' for your browser or file manager when Android prompts.",
+            "Track automatic updates via Obtainium by adding the GitHub repository URL, and verify downloaded packages against SHA256SUMS.txt.",
+            "Check your currently installed version number anytime at the bottom of your Profile screen."
+        ),
+        tips = listOf(
+            "Keep the same signing keystore across upgrades so Android installs updates cleanly without uninstalling existing local data."
+        )
     )
 )
 
@@ -421,7 +439,8 @@ fun AppManualScreen(
         "Search & Details",
         "Chat Management",
         "Real-Time & Receipts",
-        "Privacy & Safety"
+        "Privacy & Safety",
+        "Downloads & Updates"
     )
 
     val filteredSections = remember(searchQuery, selectedCategory) {

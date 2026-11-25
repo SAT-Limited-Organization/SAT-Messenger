@@ -190,6 +190,11 @@ class ContactsScreenAndManualTest {
         composeRule.onNodeWithTag("manual_search_field").performTextInput("Admin Promotion")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Admin Promotion in Groups, Channels & Communities").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("manual_search_field").performTextClearance()
+        composeRule.onNodeWithTag("manual_search_field").performTextInput("Obtainium")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Downloads, Updates & Sideloading").assertIsDisplayed()
     }
 }
 

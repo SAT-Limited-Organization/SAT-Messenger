@@ -10,54 +10,70 @@
 
 ---
 
-## Download APK (GitHub)
+## Download & Distribution (GitHub & Other Services)
 
-> **Important Setup Note:** Replace `<OWNER>/<REPO>` below with your GitHub username and repository name after pushing this project to GitHub. A live download URL is created only after the project is pushed to your GitHub repository and either a GitHub Release is published or the included GitHub Actions workflow completes.
+**SAT Messenger** is packaged for direct download from **GitHub Releases**, automatic updates via **Obtainium**, **Google Play** (`.aab`), and third-party Android distribution platforms / enterprise MDM (signed universal `.apk`, non-Play metadata compliant).
 
-[![Download SAT Messenger APK](https://img.shields.io/badge/Download-SAT%20Messenger%20APK-00BFA5?style=for-the-badge&logo=android&logoColor=white)](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk)
+[![Download Release APK](https://img.shields.io/badge/Download-Release%20APK-00BFA5?style=for-the-badge&logo=android&logoColor=white)](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.apk)
+[![Download Debug APK](https://img.shields.io/badge/Download-Testing%20APK-1E88E5?style=for-the-badge&logo=github&logoColor=white)](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk)
 
-- **Direct Release Asset Link (after pushing to GitHub):**  
-  `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk`
-- **All GitHub Releases:**  
-  `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases`
+| Package / Artifact | Intended Service / Use Case | Direct Latest Link |
+| :--- | :--- | :--- |
+| **Signed Release APK** | Direct install, Obtainium, APKPure, Uptodown, MDM, mirrors | [`sat-messenger-release.apk`](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.apk) *(requires release signing secrets below)* |
+| **Universal Debug APK** | Instant GitHub sideloading & Firebase QA testing | [`sat-messenger-debug.apk`](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk) |
+| **Android App Bundle** | Google Play Console submission | [`sat-messenger-release.aab`](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.aab) *(requires release signing secrets)* |
+| **SHA-256 Checksums** | Integrity verification across download mirrors | [`SHA256SUMS.txt`](https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/SHA256SUMS.txt) |
+
+- **All Versioned GitHub Releases:** `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases`
 - **Application ID:** `com.aistudio.satmessenger.satlim`
 - **Version:** `2.2.07.11.2026.14.5.0` (`versionCode: 2`)
 - **Minimum Android Version:** Android 7.0 (`minSdk 24`, `targetSdk 36`)
+- **Third-Party Store Compatibility:**
+  - `dependenciesInfo.includeInApk = false` (avoids encrypted Play-only signing blocks inside APKs for clean scanning/verification on F-Droid-compatible trackers & third-party mirrors).
+  - `<uses-feature android:name="android.hardware.microphone" android:required="false" />` so phones, tablets, foldables, and Chromebooks are all eligible.
+  - Zero broad storage permissions (`PickVisualMedia` photo/video picker).
+
+### Install & Auto-Update Guides
+
+- **GitHub Releases (Direct APK):** Download `sat-messenger-release.apk` (or `sat-messenger-debug.apk`) on Android, tap the downloaded file, and allow **"Install unknown apps"** for your browser or file manager when prompted.
+- **Obtainium (Auto-Updates from GitHub):** Add `https://github.com/SAT-Limited-Organization/SAT-Messenger` in Obtainium to automatically track versioned releases (`v2.2.07.11.2026.14.5.0`, etc.) and install updates with one tap.
+- **Verify Download Integrity:**
+  ```bash
+  sha256sum -c SHA256SUMS.txt
+  ```
 
 ---
 
-## How to Get the APK & Publish the GitHub Download Link
+## Automated GitHub CI/CD Release Setup
 
-This repository includes an automated release workflow at [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml). Follow either path below depending on how you deploy:
+This repository includes [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml), which builds on every push to `main`/`master`, every `v*` tag, or manual workflow dispatch:
 
-### Option 1: Automatic GitHub Release Download Link (Recommended)
-1. **Ensure Firebase & Keystore config are available to GitHub Actions:**
-   - Either commit `app/google-services.json` and `debug.keystore.base64` to the repository, **or** add them under **GitHub Repository → Settings → Secrets and variables → Actions**:
-     - `GOOGLE_SERVICES_JSON`: Full JSON (or base64) contents of `app/google-services.json`.
-     - `DEBUG_KEYSTORE_BASE64` *(optional, required for Google Sign-In SHA-1 matching)*: Base64 contents of `debug.keystore.base64` (if omitted, CI generates a fallback debug keystore automatically).
-2. **Push the project to GitHub** (from Google AI Studio **Settings -> Push to GitHub**, or using `git push` to `main`).
-3. Once pushed, GitHub Actions automatically runs **Build & Release Android APK** ([`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml)):
-   - Restores `app/google-services.json` and `debug.keystore`.
-   - Compiles the APK via `gradle :app:assembleDebug`.
-   - Publishes a GitHub Release tagged `latest` (or the pushed `v*` tag) with **`sat-messenger-debug.apk`** attached.
-4. Download the APK directly from **Releases → `sat-messenger-debug.apk`** using the badge link above.
+1. **Add GitHub Repository Secrets** (**Settings → Secrets and variables → Actions**):
+   - `GOOGLE_SERVICES_JSON`: Full JSON (or base64) contents of `app/google-services.json`.
+   - `DEBUG_KEYSTORE_BASE64` *(recommended for Google Sign-In in QA APK)*: Base64 contents of `debug.keystore.base64`.
+   - **For Signed Release APK (`sat-messenger-release.apk`) & Play Store AAB (`sat-messenger-release.aab`):**
+     - `RELEASE_KEYSTORE_BASE64`: Base64-encoded `.jks` keystore containing key alias `upload`:
+       ```bash
+       keytool -genkeypair -v -keystore my-upload-key.jks -alias upload \
+         -keyalg RSA -keysize 2048 -validity 10000
+       base64 -w 0 my-upload-key.jks
+       ```
+     - `STORE_PASSWORD`: Keystore password for `my-upload-key.jks`.
+     - `KEY_PASSWORD`: Key password for alias `upload`.
+2. **Push to GitHub** (from Google AI Studio **Settings → Push to GitHub** or `git push`).
+3. GitHub Actions automatically tags/publishes **`SAT Messenger v<versionName>`** (`make_latest: true`) with versioned + latest APK/AAB assets and `SHA256SUMS.txt`.
 
-### Option 2: Generate APK Directly in Google AI Studio
-1. Open the **Settings** menu in Google AI Studio Build.
-2. Select **Generate APK / AAB** to build and download `app-debug.apk` (also produced locally at `app/build/outputs/apk/debug/app-debug.apk`).
-3. On GitHub, open your repository -> **Releases -> Draft a new release**, attach the downloaded APK as `sat-messenger-debug.apk`, and publish the release.
-
-### Option 3: Build Locally via Gradle
+### Build Locally via Gradle
 ```bash
-# Build signed debug APK
+# Restore/verify debug signing keystore if needed
+bash scripts/ensure-debug-keystore.sh
+
+# Build universal debug APK -> app/build/outputs/apk/debug/app-debug.apk
 gradle :app:assembleDebug
-# Output: app/build/outputs/apk/debug/app-debug.apk
 
-# Build release APK (requires release keystore env vars)
-gradle :app:assembleRelease
+# Build signed release APK & Play AAB (requires KEYSTORE_PATH, STORE_PASSWORD, KEY_PASSWORD)
+gradle :app:assembleRelease :app:bundleRelease
 ```
-
-> **Android Sideloading Note:** When installing `.apk` builds outside Google Play, allow **"Install unknown apps"** for your browser or file manager when prompted by Android.
 
 ---
 
@@ -166,5 +182,5 @@ firebase emulators:exec --only auth,firestore --project demo-no-project \
 ## Configuration Notes
 
 - **Firebase:** Client configuration is stored in `app/google-services.json` (project `sat-limited`). Deploy rule updates with `firebase deploy --only firestore:rules`.
-- **Release Signing:** Configure `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` environment variables or CI secrets when building a Play-signed release APK/AAB (`gradle :app:assembleRelease`).
+- **Release Signing:** Configure `KEYSTORE_PATH` (default `my-upload-key.jks`, key alias `upload`), `STORE_PASSWORD`, and `KEY_PASSWORD` environment variables or CI secrets when building a signed release APK/AAB (`gradle :app:assembleRelease :app:bundleRelease`).
 - **Secrets:** Environment keys belong in AI Studio's **Secrets** panel (mapped via `.env.example`), never hardcoded in source files.
