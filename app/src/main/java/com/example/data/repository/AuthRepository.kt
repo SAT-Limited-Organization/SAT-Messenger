@@ -38,7 +38,7 @@ sealed interface AuthUiState {
 class AuthRepository(
     private val context: Context,
     private val auth: FirebaseAuth = Firebase.auth,
-    private val credentialManager: CredentialManager = CredentialManager.create(context)
+    private val credentialManager: CredentialManager? = null
 ) {
 
     private val _authState = MutableStateFlow<AuthUiState>(
@@ -73,9 +73,15 @@ class AuthRepository(
             return
         }
 
+        // CredentialManager UI/auto-sign-in requires an Activity context; avoid calling it with ApplicationContext
+        // so we never race with or overwrite an active manual Google Sign-In flow.
+        val activityContext = context as? Activity ?: return
+
         scope.launch {
-            val clientId = resolveDefaultWebClientId(context) ?: run {
-                _authState.value = AuthUiState.Unauthenticated
+            val clientId = resolveDefaultWebClientId(activityContext) ?: run {
+                if (_authState.value is AuthUiState.Initial) {
+                    _authState.value = AuthUiState.Unauthenticated
+                }
                 return@launch
             }
 
@@ -90,7 +96,8 @@ class AuthRepository(
                 .build()
 
             try {
-                val result = credentialManager.getCredential(context, request)
+                val cm = credentialManager ?: CredentialManager.create(activityContext)
+                val result = cm.getCredential(activityContext, request)
                 val credential = result.credential
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
@@ -99,15 +106,19 @@ class AuthRepository(
                     authResult.user?.let {
                         _authState.value = AuthUiState.Authenticated(it)
                     } ?: run {
-                        _authState.value = AuthUiState.Unauthenticated
+                        if (_authState.value is AuthUiState.Initial) {
+                            _authState.value = AuthUiState.Unauthenticated
+                        }
                     }
-                } else {
+                } else if (_authState.value is AuthUiState.Initial) {
                     _authState.value = AuthUiState.Unauthenticated
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                _authState.value = AuthUiState.Unauthenticated
+            } catch (_: Exception) {
+                if (_authState.value is AuthUiState.Initial) {
+                    _authState.value = AuthUiState.Unauthenticated
+                }
             }
         }
     }
@@ -117,6 +128,35 @@ class AuthRepository(
         return try {
             val resId = ctx.resources.getIdentifier("default_web_client_id", "string", ctx.packageName)
             if (resId != 0) ctx.getString(resId).trim().ifBlank { null } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    internal fun resolveAppSigningSha1(ctx: Context = context): String? {
+        return try {
+            val pm = ctx.packageManager
+            val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val info = pm.getPackageInfo(
+                    ctx.packageName,
+                    android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+                )
+                val signingInfo = info.signingInfo ?: return null
+                if (signingInfo.hasMultipleSigners()) {
+                    signingInfo.apkContentsSigners
+                } else {
+                    signingInfo.signingCertificateHistory
+                }
+            } else {
+                pm.getPackageInfo(
+                    ctx.packageName,
+                    android.content.pm.PackageManager.GET_SIGNATURES
+                ).signatures
+            }
+            val certBytes = signatures?.firstOrNull()?.toByteArray() ?: return null
+            val digest = java.security.MessageDigest.getInstance("SHA-1").digest(certBytes)
+            digest.joinToString(":") { "%02X".format(it) }
         } catch (_: Exception) {
             null
         }
@@ -141,7 +181,8 @@ class AuthRepository(
 
         scope.launch {
             try {
-                val result = credentialManager.getCredential(activity, request)
+                val cm = credentialManager ?: CredentialManager.create(activity)
+                val result = cm.getCredential(activity, request)
                 val credential = result.credential
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
@@ -150,22 +191,31 @@ class AuthRepository(
                     authResult.user?.let {
                         _authState.value = AuthUiState.Authenticated(it)
                     } ?: run {
-                        _authState.value = AuthUiState.Error("Google sign-in failed")
-                        onError("Google sign-in failed")
+                        val err = "Firebase sign-in returned no user. Please try again."
+                        _authState.value = AuthUiState.Error(err)
+                        onError(err)
                     }
                 } else {
-                    val err = "Unexpected credential returned"
+                    val err = "Unexpected credential type returned (${credential.type})."
                     _authState.value = AuthUiState.Error(err)
                     onError(err)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: GetCredentialCancellationException) {
-                Log.w("Auth", "Google Sign-In flow cancelled: ${e.message}", e)
-                _authState.value = AuthUiState.Unauthenticated
+                Log.w("Auth", "Google Sign-In flow cancelled/rejected: ${e.message}", e)
+                val sha1 = resolveAppSigningSha1(activity)
+                val shaHint = if (sha1 != null) " APK SHA-1: $sha1" else ""
+                val msg = "Google Sign-In did not complete (${e.message ?: "cancelled"}). " +
+                    "If this happened right after selecting your account, verify that this APK's SHA-1 is registered in Firebase Console and matches your GOOGLE_SERVICES_JSON secret.$shaHint"
+                _authState.value = AuthUiState.Error(msg)
+                onError(msg)
             } catch (e: Exception) {
                 Log.e("Auth", "Google Sign-In failed", e)
-                val errorMsg = e.localizedMessage ?: "Google sign-in failed"
+                val sha1 = resolveAppSigningSha1(activity)
+                val shaHint = if (sha1 != null) " (APK SHA-1: $sha1)" else ""
+                val baseMsg = e.localizedMessage?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+                val errorMsg = "Google Sign-In failed: $baseMsg$shaHint"
                 _authState.value = AuthUiState.Error(errorMsg)
                 onError(errorMsg)
             }
@@ -177,7 +227,8 @@ class AuthRepository(
         scope.launch {
             withContext(NonCancellable) {
                 try {
-                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                    val cm = credentialManager ?: CredentialManager.create(context)
+                    cm.clearCredentialState(ClearCredentialStateRequest())
                 } catch (e: Exception) {
                     Log.e("Auth", "Failed to clear credential state", e)
                 }

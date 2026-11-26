@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAT Messenger — Enterprise Android Messaging &amp; Documentation</title>
+  <meta name="description" content="Official documentation, download packages, user manual, and architecture guide for SAT Messenger (com.aistudio.satmessenger.satlim)." />
+  <link rel="icon" type="image/jpeg" href="assets/sat-messenger-logo.jpg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-inner" aria-label="Primary Navigation">
+      <a class="brand" href="index.html">
+        <img src="assets/sat-messenger-logo.jpg" alt="SAT Messenger Logo" />
+        <span>SAT Messenger</span>
+        <span class="brand-tag">v2.2.07.11.2026.14.5.0</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html" class="active">Overview &amp; Downloads</a>
+        <a href="manual.html">User Manual</a>
+        <a href="architecture.html">Architecture &amp; CI/CD</a>
+        <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <img class="hero-logo" src="assets/sat-messenger-logo.jpg" alt="SAT Messenger App Icon" />
+      <div>
+        <h1>SAT Messenger Documentation</h1>
+        <p>
+          <strong>SAT Messenger</strong> is a native Kotlin and Jetpack Compose enterprise &amp; team messaging application for
+          <strong>SAT Limited</strong>, built on Material Design 3, Firebase Authentication (Google Credential Manager),
+          <strong>SAT Limited AI</strong> (Firebase AI Logic + App Check), and real-time Cloud Firestore synchronization.
+        </p>
+        <div class="badge-row">
+          <span class="pill green">Android 7.0+ (API 24–36)</span>
+          <span class="pill blue">Kotlin 2.2.10 · Compose M3</span>
+          <span class="pill teal">Firebase Auth &amp; Firestore</span>
+          <span class="pill">App ID: <code>com.aistudio.satmessenger.satlim</code></span>
+          <span class="pill">Version <code>2.2.07.11.2026.14.5.0</code> (Build 2)</span>
+        </div>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.apk">
+            Download Release APK
+          </a>
+          <a class="btn btn-secondary" href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk">
+            Download Universal Debug APK
+          </a>
+          <a class="btn btn-outline" href="manual.html">
+            Read Web User Manual
+          </a>
+          <a class="btn btn-outline" href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases" target="_blank" rel="noopener noreferrer">
+            All GitHub Releases
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <div class="jump-bar" aria-label="On-page sections">
+      <a href="#downloads">Download &amp; Distribution</a>
+      <a href="#install-guides">Install &amp; Auto-Update</a>
+      <a href="#features">Key Features</a>
+      <a href="#tech-stack">Tech Stack</a>
+      <a href="#permissions">Permissions</a>
+      <a href="#cicd">CI/CD &amp; Local Build</a>
+      <a href="#testing">Verification &amp; Config</a>
+    </div>
+
+    <section id="downloads" class="section">
+      <div class="section-header">
+        <h2>Download &amp; Distribution (GitHub &amp; Other Services)</h2>
+        <span class="section-subtitle">Automated multi-format packages from GitHub Releases</span>
+      </div>
+
+      <p>
+        <strong>SAT Messenger</strong> is packaged for direct download from <strong>GitHub Releases</strong>, automatic updates via
+        <strong>Obtainium</strong>, <strong>Google Play</strong> (<code>.aab</code>), and third-party Android distribution platforms or enterprise MDM
+        (signed universal <code>.apk</code>, non-Play metadata compliant).
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Package / Artifact</th>
+              <th>Intended Service / Use Case</th>
+              <th>Direct Latest Link</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Signed Release APK</strong></td>
+              <td>Direct install, Obtainium, APKPure, Uptodown, MDM, mirrors <em>(requires release signing secrets)</em></td>
+              <td><a href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.apk"><code>sat-messenger-release.apk</code></a></td>
+            </tr>
+            <tr>
+              <td><strong>Universal Debug APK</strong></td>
+              <td>Instant GitHub sideloading &amp; Firebase QA testing</td>
+              <td><a href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-debug.apk"><code>sat-messenger-debug.apk</code></a></td>
+            </tr>
+            <tr>
+              <td><strong>Android App Bundle</strong></td>
+              <td>Google Play Console submission <em>(requires release signing secrets)</em></td>
+              <td><a href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.aab"><code>sat-messenger-release.aab</code></a></td>
+            </tr>
+            <tr>
+              <td><strong>SHA-256 Checksums</strong></td>
+              <td>Integrity verification across download mirrors</td>
+              <td><a href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/SHA256SUMS.txt"><code>SHA256SUMS.txt</code></a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-3" style="margin-top: 1rem;">
+        <div class="card">
+          <h3>Package Identity</h3>
+          <ul>
+            <li><strong>Application ID:</strong> <code>com.aistudio.satmessenger.satlim</code></li>
+            <li><strong>Version Name:</strong> <code>2.2.07.11.2026.14.5.0</code></li>
+            <li><strong>Version Code:</strong> <code>2</code></li>
+            <li><strong>Android Support:</strong> <code>minSdk 24</code> (Android 7.0) to <code>targetSdk 36</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Third-Party Store Compatibility</h3>
+          <ul>
+            <li><code>dependenciesInfo.includeInApk = false</code> omits Play-only signing dependency blocks inside APKs for clean mirror/tracker scanning.</li>
+            <li><code>&lt;uses-feature android:name="android.hardware.microphone" android:required="false" /&gt;</code> ensures phones, tablets, foldables, and Chromebooks stay eligible.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Zero Broad Storage Access</h3>
+          <ul>
+            <li>Uses Android's zero-permission <code>PickVisualMedia</code> photo &amp; video picker.</li>
+            <li>No <code>READ_EXTERNAL_STORAGE</code>, <code>READ_MEDIA_IMAGES</code>, or <code>READ_MEDIA_VIDEO</code> declarations.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="install-guides" class="section">
+      <div class="section-header">
+        <h2>Install &amp; Auto-Update Guides</h2>
+        <span class="section-subtitle">GitHub Releases, Obtainium, and SHA-256 Verification</span>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Sideloading &amp; Obtainium Auto-Updates</h3>
+          <ul>
+            <li><strong>GitHub Releases (Direct APK):</strong> Download <code>sat-messenger-release.apk</code> (or <code>sat-messenger-debug.apk</code>) on Android, tap the file, and allow <em>"Install unknown apps"</em> for your browser or file manager when prompted.</li>
+            <li><strong>Obtainium Auto-Updates:</strong> Add <code>https://github.com/SAT-Limited-Organization/SAT-Messenger</code> in Obtainium to track versioned releases (<code>v2.2.07.11.2026.14.5.0</code>, etc.) and install updates with one tap.</li>
+            <li><strong>Upgrade Continuity:</strong> Keep the same signing keystore across upgrades so Android installs updates cleanly without uninstalling existing local data.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Verify Download Integrity</h3>
+          <p>Verify any downloaded APK or App Bundle against the release's <code>SHA256SUMS.txt</code> manifest:</p>
+          <pre><code>sha256sum -c SHA256SUMS.txt</code></pre>
+          <p>You can also confirm your currently installed version and build number anytime at the bottom of the in-app <strong>Profile</strong> screen.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-header">
+        <h2>Key Features</h2>
+        <span class="section-subtitle">Complete feature overview from README &amp; User Manual</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Authentication &amp; Onboarding <span class="pill teal">Zero-Trust</span></h3>
+          <ul>
+            <li><strong>Google Identity Sign-In:</strong> Authenticate securely with <strong>Google</strong> (Jetpack <code>CredentialManager</code> + Firebase Auth) with automatic Cloud Firestore profile provisioning.</li>
+            <li><strong>Pre-Auth &amp; In-App Manual:</strong> A synchronized <strong>App Manual &amp; User Guide</strong> is available directly on the Sign-In / Registration screen as well as inside the authenticated app, searchable by feature and category.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Contacts &amp; Real-Time Availability <span class="pill green">Live Sync</span></h3>
+          <ul>
+            <li><strong>Firestore-Synced Contact Directory:</strong> Syncs registered user profiles in real time under <code>users/{userId}</code>.</li>
+            <li><strong>Live Availability Statuses:</strong> Broadcast and view <code>Available</code>, <code>Busy</code>, <code>Away</code>, <code>In a Meeting</code>, <code>Do Not Disturb</code>, and <code>Offline</code> (with relative <em>Last seen</em> timestamps).</li>
+            <li><strong>Friends &amp; Filtering:</strong> Star/unstar favorite contacts into <code>/users/{userId}/contacts/{contactId}</code>, filter by <strong>All</strong>, <strong>Online</strong>, <strong>Friends</strong>, or <strong>Colleagues</strong>, and search by name, <code>@handle</code>, email, or phone.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>SAT Limited AI Assistant <span class="pill blue">AI + Search</span></h3>
+          <ul>
+            <li><strong>Powered by Firebase AI Logic &amp; App Check:</strong> Conversational assistant built directly into the Chats screen with multi-turn context, streaming answers, and zero hardcoded API keys.</li>
+            <li><strong>Model Modes &amp; Multimodal Input:</strong> Switch between <strong>Smart</strong> (<code>gemini-3.8-flash</code>), <strong>Fast</strong> (<code>gemini-3.5-flash-lite</code>), and <strong>Reasoning</strong> (<code>gemini-4-argon</code>), and attach photos via Android Photo Picker for visual Q&amp;A.</li>
+            <li><strong>Google Search Grounding:</strong> Toggle live Google Search grounding to enrich answers with web queries and clickable citation source links.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Messaging, Reactions, Voice &amp; Media <span class="pill">Real-Time</span></h3>
+          <ul>
+            <li><strong>1-on-1 &amp; Group Chats:</strong> Live typing indicators, read receipts, unread badges, quoted replies, and clear sender attribution.</li>
+            <li><strong>Emoji Reactions:</strong> Long-press any message to add or toggle reactions (👍, ❤️, 😂, 😮, 😢, 🙏, 🔥, 🎉, 👏, 🚀, plus extended emoji picker).</li>
+            <li><strong>Voice Recording &amp; Playback:</strong> Record inline audio clips up to 90 seconds (<code>RECORD_AUDIO</code>), preview before sending, and play/scrub inside chat bubbles.</li>
+            <li><strong>Photo, Video &amp; Document Sharing:</strong> Zero-permission Photo Picker (<code>ImageAndVideo</code>), document composer, full-screen image viewer, inline <code>VideoView</code> player, and chat management controls.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Admin Promotion, Channels, Communities &amp; Status <span class="pill teal">Governance</span></h3>
+          <ul>
+            <li><strong>Admin Promotion (Groups, Channels &amp; Communities):</strong> Creators and existing admins can promote or dismiss fellow members as Admins, backed by Cloud Firestore security rules that protect creators.</li>
+            <li><strong>Flexible Broadcast Channels:</strong> Public or invite-only channels with custom categories, follower posting toggles, reactions, and admin management.</li>
+            <li><strong>Communities &amp; Invite Links:</strong> Group departmental rooms and an announcements hub under communities; share/reset deep links (<code>satmessenger://invite/&lt;code&gt;</code> and <code>https://satmessenger.app/invite/&lt;code&gt;</code>).</li>
+            <li><strong>24-Hour Status Updates:</strong> Share text, photos, or short videos as stories with viewer tracking and inline replies.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Phone Notification Center Alerts <span class="pill">Android 13+</span></h3>
+          <ul>
+            <li><strong>Dedicated Channels:</strong> <em>Direct &amp; Group Messages</em> and <em>Channels &amp; Alerts</em> channels in Android Notification Center.</li>
+            <li><strong>Runtime Permission &amp; Deep Routing:</strong> Requests <code>POST_NOTIFICATIONS</code> cleanly on Android 13+, posts unread alerts when chats are closed, and navigates straight to the target chat on tap.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="tech-stack" class="section">
+      <div class="section-header">
+        <h2>Tech Stack</h2>
+        <span class="section-subtitle">Native Android libraries &amp; Firebase backend services</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Technology</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Language &amp; Async</strong></td>
+              <td>Kotlin <code>2.2.10</code>, Kotlin Coroutines &amp; StateFlow</td>
+            </tr>
+            <tr>
+              <td><strong>UI Framework</strong></td>
+              <td>Jetpack Compose (BOM <code>2024.09.00</code>), Material Design 3</td>
+            </tr>
+            <tr>
+              <td><strong>AI &amp; Grounding</strong></td>
+              <td>Firebase AI Logic (<code>firebase-ai</code>), Firebase App Check, Google Search Grounding</td>
+            </tr>
+            <tr>
+              <td><strong>Authentication</strong></td>
+              <td>Firebase Auth, Jetpack <code>CredentialManager</code>, Google Identity</td>
+            </tr>
+            <tr>
+              <td><strong>Cloud Database</strong></td>
+              <td>Cloud Firestore with real-time snapshot listeners &amp; server timestamps</td>
+            </tr>
+            <tr>
+              <td><strong>Media &amp; Audio</strong></td>
+              <td>Coil Compose <code>2.7.0</code>, Android Photo Picker (Image &amp; Video), <code>VideoView</code>, <code>MediaRecorder</code> / <code>MediaPlayer</code></td>
+            </tr>
+            <tr>
+              <td><strong>Testing</strong></td>
+              <td>JUnit 4, Robolectric <code>4.16.1</code>, Compose UI Test, Firebase Auth &amp; Firestore Emulators</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="permissions" class="section">
+      <div class="section-header">
+        <h2>Permissions</h2>
+        <span class="section-subtitle">Least-privilege Android manifest &amp; runtime declarations</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>Usage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>INTERNET</code> / <code>ACCESS_NETWORK_STATE</code></td>
+              <td>Real-time Firebase Authentication, Cloud Firestore sync, and SAT Limited AI requests</td>
+            </tr>
+            <tr>
+              <td><code>POST_NOTIFICATIONS</code></td>
+              <td>Incoming message alerts in the Android Notification Center (Android 13+)</td>
+            </tr>
+            <tr>
+              <td><code>RECORD_AUDIO</code></td>
+              <td>Runtime permission requested only when recording voice clips in chat (<code>hardware.microphone</code> marked optional)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        Photo &amp; video selection uses the Android Photo Picker (<code>PickVisualMedia</code>) and requires <strong>zero broad storage permissions</strong>.
+      </div>
+    </section>
+
+    <section id="cicd" class="section">
+      <div class="section-header">
+        <h2>Automated GitHub CI/CD &amp; Local Build</h2>
+        <span class="section-subtitle">Workflow: <code>.github/workflows/release-apk.yml</code></span>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>GitHub Repository Secrets</h3>
+          <p>Configure under <strong>Settings → Secrets and variables → Actions</strong>:</p>
+          <ul>
+            <li><code>GOOGLE_SERVICES_JSON</code>: Full JSON (or base64) contents of <code>app/google-services.json</code>.</li>
+            <li><code>DEBUG_KEYSTORE_BASE64</code>: Base64 contents of <code>debug.keystore.base64</code> (for Google Sign-In in QA builds).</li>
+            <li><code>RELEASE_KEYSTORE_BASE64</code>: Base64-encoded <code>.jks</code> keystore containing key alias <code>upload</code>.</li>
+            <li><code>STORE_PASSWORD</code> &amp; <code>KEY_PASSWORD</code>: Passwords for your upload keystore and alias <code>upload</code>.</li>
+          </ul>
+          <pre><code>keytool -genkeypair -v -keystore my-upload-key.jks -alias upload \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w 0 my-upload-key.jks</code></pre>
+        </div>
+        <div class="card">
+          <h3>Build Locally via Gradle</h3>
+          <p>Run these commands from the repository root:</p>
+          <pre><code># Restore/verify debug signing keystore if needed
+bash scripts/ensure-debug-keystore.sh
+
+# Build universal debug APK -> app/build/outputs/apk/debug/app-debug.apk
+gradle :app:assembleDebug
+
+# Build signed release APK &amp; Play AAB (requires KEYSTORE_PATH, STORE_PASSWORD, KEY_PASSWORD)
+gradle :app:assembleRelease :app:bundleRelease</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="testing" class="section">
+      <div class="section-header">
+        <h2>Verification &amp; Configuration Notes</h2>
+        <span class="section-subtitle">Firestore security tests, Robolectric UI suite, and environment safety</span>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Run Full Test Suite</h3>
+          <pre><code># Run Firestore rules tests and Android debug unit tests together
+firebase emulators:exec --only auth,firestore --project demo-no-project \
+  "node --test firestore.test.js && gradle :app:testDebugUnitTest"</code></pre>
+        </div>
+        <div class="card">
+          <h3>Configuration Notes</h3>
+          <ul>
+            <li><strong>Firebase:</strong> Client configuration is stored in <code>app/google-services.json</code> (project <code>sat-limited</code>). Deploy rule updates with <code>firebase deploy --only firestore:rules</code>.</li>
+            <li><strong>Release Signing:</strong> Configure <code>KEYSTORE_PATH</code> (default <code>my-upload-key.jks</code>, key alias <code>upload</code>), <code>STORE_PASSWORD</code>, and <code>KEY_PASSWORD</code> when building a signed release APK/AAB.</li>
+            <li><strong>Secrets:</strong> Environment keys belong in AI Studio's <strong>Secrets</strong> panel (mapped via <code>.env.example</code>), never hardcoded in source files.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <strong>SAT Messenger</strong> · SAT Limited Organization ·
+      <a href="manual.html">User Manual</a> ·
+      <a href="architecture.html">Architecture &amp; CI/CD</a> ·
+      <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </p>
+  </footer>
+</body>
+</html>

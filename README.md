@@ -5,8 +5,11 @@
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Firebase](https://img.shields.io/badge/Backend-Firebase%20Auth%20%26%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
 [![Version](https://img.shields.io/badge/Version-2.2.07.11.2026.14.5.0-0A2540)](app/build.gradle.kts)
+[![Docs](https://img.shields.io/badge/Docs-GitHub%20Pages-00BFA5)](https://sat-limited-organization.github.io/SAT-Messenger/)
 
 **SAT Messenger** is a native Kotlin and Jetpack Compose enterprise & team messaging application for **SAT Limited**, built on Material Design 3, Firebase Authentication (Google Credential Manager), and real-time Cloud Firestore synchronization.
+
+> **GitHub Pages Documentation:** Browse the full documentation, downloadable packages, and searchable web User Manual in [`docs/`](docs/index.html) (enable **Settings → Pages → Deploy from a branch → `/docs`** to publish at `https://sat-limited-organization.github.io/SAT-Messenger/`).
 
 ---
 
@@ -118,6 +121,11 @@ The app follows **MVVM** + **Clean Repository Architecture** with reactive Kotli
 ```text
 ├── .github/workflows/
 │   └── release-apk.yml               # Automated APK build & GitHub Release publisher
+├── docs/                             # GitHub Pages static site & web User Manual
+│   ├── index.html                    # Landing page, downloads & full app docs
+│   ├── manual.html                   # Interactive searchable web User Manual
+│   ├── architecture.html             # Architecture, Firestore schema & CI/CD docs
+│   └── README.md                     # Markdown documentation index
 ├── app/
 │   ├── build.gradle.kts              # Android app build config & dependencies
 │   ├── google-services.json          # Firebase client configuration

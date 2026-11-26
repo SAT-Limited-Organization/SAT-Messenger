@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App Manual &amp; User Guide — SAT Messenger</title>
+  <meta name="description" content="Searchable web User Manual for SAT Messenger covering Google Sign-In, Contacts Sync, SAT Limited AI, Voice Clips, Admin Promotion, Media Sharing, Privacy, and Downloads." />
+  <link rel="icon" type="image/jpeg" href="assets/sat-messenger-logo.jpg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-inner" aria-label="Primary Navigation">
+      <a class="brand" href="index.html">
+        <img src="assets/sat-messenger-logo.jpg" alt="SAT Messenger Logo" />
+        <span>SAT Messenger</span>
+        <span class="brand-tag">User Manual</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html">Overview &amp; Downloads</a>
+        <a href="manual.html" class="active">User Manual</a>
+        <a href="architecture.html">Architecture &amp; CI/CD</a>
+        <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <img class="hero-logo" src="assets/sat-messenger-logo.jpg" alt="SAT Messenger App Icon" />
+      <div>
+        <h1>SAT Messenger User Manual</h1>
+        <p>
+          Web companion synchronized with the in-app <strong>App Manual &amp; User Guide</strong> (available both before sign-in on the Registration screen and inside your Profile tab).
+          Search by keyword or filter by category below.
+        </p>
+        <div class="badge-row">
+          <span class="pill teal">19 Feature Guides</span>
+          <span class="pill blue">Synced with App v2.2.07.11.2026.14.5.0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="manual-controls">
+        <input
+          id="manualSearch"
+          class="search-input"
+          type="search"
+          placeholder="Search manual (e.g. Google, SAT Limited AI, Admin Promotion, Voice, Obtainium, Invite)..."
+          aria-label="Search SAT Messenger manual"
+        />
+        <div id="categoryChips" class="chip-row" role="tablist" aria-label="Manual categories"></div>
+      </div>
+
+      <div id="manualGrid" class="grid-2"></div>
+      <p id="emptyState" class="callout" style="display: none;">
+        No manual sections matched your filter. Try clearing the search box or switching back to <strong>All</strong>.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <strong>SAT Messenger</strong> · <a href="index.html">Overview &amp; Downloads</a> ·
+      <a href="architecture.html">Architecture &amp; CI/CD</a>
+    </p>
+  </footer>
+
+  <script>
+    const MANUAL_SECTIONS = [
+      {
+        category: "Getting Started",
+        badge: "Zero-Trust",
+        title: "Registration & Sign-In (Google)",
+        summary: "Register or sign in to SAT Messenger securely using your Google account.",
+        steps: [
+          "On the Sign-In / Registration screen, tap 'Continue with Google'.",
+          "Select your Google account via Android Credential Manager; your profile is automatically created and synced to Cloud Firestore on first sign-in.",
+          "Need help before signing in? Tap 'App Manual & User Guide' directly on the Registration / Sign-In screen at any time."
+        ],
+        tip: "Your display name, @username handle, avatar, and real-time availability sync immediately upon registration. Anonymous sign-in is disabled to preserve zero-trust security."
+      },
+      {
+        category: "Contacts & Availability",
+        badge: "Live Sync",
+        title: "Contacts Sync & Real-Time Availability",
+        summary: "View all Firestore-synced friends and colleagues with real-time online status and availability badges.",
+        steps: [
+          "Tap the 'Contacts' tab on the bottom navigation bar to open your live contact directory.",
+          "Set your own real-time availability at the top ('Available', 'Busy', 'Away', 'In a Meeting', or 'Do Not Disturb') — changes sync instantly to other users.",
+          "Filter contacts by All, Online, Friends, or Colleagues, or search by name, @handle, email, phone, or availability.",
+          "Tap the Star icon next to any contact to add or remove them from your personal Friends list.",
+          "Tap any contact row to inspect their live availability, Last Seen timestamp, email, or phone number, or tap Message to open a chat."
+        ],
+        tip: "Green = Available, Blue = In a Meeting, Amber = Away, Red = Busy / Do Not Disturb, Gray = Offline with relative Last Seen time."
+      },
+      {
+        category: "Direct Chats",
+        badge: "Direct",
+        title: "1-on-1 Messaging & Emoji Reactions",
+        summary: "Communicate privately in real time with colleagues and friends using replies and emoji reactions.",
+        steps: [
+          "Tap the '+' (New Message) floating button or pick someone from the Contacts tab to start a 1-on-1 chat.",
+          "Chats display each contact's real name or @username handle rather than generic placeholders.",
+          "Long-press any message bubble to add an emoji reaction (👍, ❤️, 😂, 😮, 😢, 🙏, 🔥, 🎉, 👏, 🚀) or tap '+' for the extended emoji grid.",
+          "Long-press a message to Reply with a quoted snippet, Copy text, or Delete for everyone."
+        ],
+        tip: "Tap any reaction pill under a message to toggle your own reaction or view everyone who reacted."
+      },
+      {
+        category: "Voice Clips",
+        badge: "Audio",
+        title: "Voice Recording & In-Chat Audio Playback",
+        summary: "Record voice notes directly inside any chat using the device microphone and play them back inline.",
+        steps: [
+          "When the message box is empty, tap the Microphone icon on the right (or choose 'Record Voice Clip' from the paperclip menu).",
+          "Grant the Microphone permission when prompted so SAT Messenger can capture audio.",
+          "Watch the live elapsed timer and amplitude bars while recording (up to 90 seconds).",
+          "Tap Stop to listen to a preview before sending, Discard to cancel, or Send immediately.",
+          "Tap Play/Pause inside any voice message bubble and drag the slider to scrub through the clip."
+        ],
+        tip: "Typing text in the composer automatically switches the Microphone button into the Send button."
+      },
+      {
+        category: "Group Rooms",
+        badge: "Collaborative",
+        title: "Group Chat Rooms",
+        summary: "Create and manage departmental group rooms with shared participant lists and invite links.",
+        steps: [
+          "Tap the '+' button on the Chats screen and switch to the 'New Group' tab.",
+          "Enter a room name, optional charter/description, and select colleagues or friends to invite.",
+          "Tap 'Create Group' to launch the room in Cloud Firestore.",
+          "Tap the room header or Participants icon inside the chat to view all members and their live availability."
+        ],
+        tip: "Incoming group messages show the sender's name and handle above each bubble for clarity."
+      },
+      {
+        category: "Invite Links",
+        badge: "Shareable",
+        title: "Channel, Group & Community Invite Links",
+        summary: "Generate, share, revoke, and redeem invite links for Group Rooms, Channels, and Communities.",
+        steps: [
+          "Open any Group Room, Channel, or Community and tap its Share Invite Link action.",
+          "Copy the invite code or share URL (e.g. https://satmessenger.app/invite/...) directly to colleagues.",
+          "Admins can tap 'Reset Link' at any time to revoke the old code and issue a fresh one.",
+          "To join via a link, tap the Link icon in the Chats top bar, paste the code or URL, preview the destination, and tap Join."
+        ],
+        tip: "Deep links (satmessenger://invite/...) automatically open the Join Invite dialog once signed in."
+      },
+      {
+        category: "Channels",
+        badge: "Flexible",
+        title: "Flexible Broadcast Channels",
+        summary: "Create public or invite-only channels with customizable posting and reaction permissions.",
+        steps: [
+          "Open the 'Updates' tab and select 'Channels'.",
+          "Tap the megaphone FAB to create a channel with a custom Category (e.g. Engineering, Operations, Alerts).",
+          "Configure flexibility toggles: Public vs Private (invite-only), Allow Follower Posts, and Allow Reactions.",
+          "Channel admins can update channel settings or delete the channel anytime from the channel header."
+        ],
+        tip: "Follower counts and broadcast posts sync live across the organization in Cloud Firestore."
+      },
+      {
+        category: "Communities",
+        badge: "Enterprise",
+        title: "Communities & Subgroup Hubs",
+        summary: "Organize related group rooms and announcement hubs under one umbrella community.",
+        steps: [
+          "Tap the 'Communities' tab on the bottom navigation bar.",
+          "Tap 'Start a Community' to create a division hub with subgroup rooms.",
+          "Share a Community invite link so members can discover and join linked subgroups."
+        ],
+        tip: "Every community features an 'Announcements' room for team-wide notices."
+      },
+      {
+        category: "SAT Limited AI",
+        badge: "AI + Search",
+        title: "SAT Limited AI Assistant",
+        summary: "Chat with SAT Limited AI using Smart, Fast, or Reasoning modes, live Google Search grounding, and photo analysis.",
+        steps: [
+          "Tap the pinned 'SAT Limited AI' card on the Chats tab or the sparkle icon in the Chats top bar.",
+          "Choose a response mode: Smart (gemini-3.8-flash), Fast (gemini-3.5-flash-lite), or Reasoning (gemini-4-argon).",
+          "Toggle 'Google Search' to ground answers with live web queries and clickable source citation links.",
+          "Tap the Image icon inside the composer to attach a photo for visual analysis, or tap Clear to reset the thread."
+        ],
+        tip: "All requests to SAT Limited AI are protected with Firebase App Check and require zero manual API keys."
+      },
+      {
+        category: "Admin Controls",
+        badge: "Governance",
+        title: "Admin Promotion in Groups, Channels & Communities",
+        summary: "Promote trusted members to Admins or dismiss admin privileges in Group Rooms, Channels, and Communities.",
+        steps: [
+          "Group Rooms: Open Group Info or tap the Participants icon in the chat header, then tap 'Make Admin' or 'Dismiss' next to any non-creator member.",
+          "Channels: Open a channel as an admin and tap the Admin shield icon in the top bar (or Channel Settings > Manage Channel Admins).",
+          "Communities: Tap the Admin shield icon on any community card in the Communities tab to manage Community Admins."
+        ],
+        tip: "Creators remain protected from demotion, and Cloud Firestore security rules verify admin privileges server-side."
+      },
+      {
+        category: "Status & Updates",
+        badge: "Stories",
+        title: "24-Hour Status Updates",
+        summary: "Share text, photos, or short videos as status stories that automatically expire after 24 hours.",
+        steps: [
+          "Open the 'Updates' tab and stay on 'Status'.",
+          "Tap '+' under My Status, then pick a Photo or Video from your gallery via the Photo Picker, or paste a media URL and choose a background color.",
+          "Tap any contact's status update to view images or play shared video clips with inline reply support."
+        ],
+        tip: "Contacts with active statuses show a green ring around their avatar in Chats."
+      },
+      {
+        category: "Media & Files",
+        badge: "Zero-Permission",
+        title: "Photos, Media & Document Sharing",
+        summary: "Share photos, short video clips, and files securely in chats and status using Android's zero-permission Photo Picker.",
+        steps: [
+          "Tap the Image icon in the chat composer (or the paperclip icon > 'Photo & Video' / 'Document & Files').",
+          "Select a photo, video clip, or file, review the preview dialog, add an optional caption, and tap Send.",
+          "Tap any image or video card inside a conversation to open the full-screen viewer/player, or browse shared items under Contact / Group Info."
+        ],
+        tip: "Photos are compressed automatically and clips are validated under real-time sync limits with zero broad storage permissions."
+      },
+      {
+        category: "Real-Time & Receipts",
+        badge: "Instant",
+        title: "Live Presence & Typing Indicators",
+        summary: "Real-time active indicators and animated typing bubbles powered by Firestore listeners.",
+        steps: [
+          "Presence automatically syncs when you open, background, or change availability in SAT Messenger.",
+          "When someone types in a chat, the header displays who is typing alongside an animated 3-dot bubble."
+        ],
+        tip: "Group rooms display multiple concurrent typers cleanly in the subtitle."
+      },
+      {
+        category: "Real-Time & Receipts",
+        badge: "Verified",
+        title: "Read Receipts & Seen Tracking",
+        summary: "Track sent, delivered, and read status ticks across direct and group conversations.",
+        steps: [
+          "Single check = sent to Firestore; double check = delivered; teal double check = read.",
+          "Long-press your outgoing message to see how many participants have read it."
+        ],
+        tip: "Disable Read Receipts anytime in Profile > Privacy Controls."
+      },
+      {
+        category: "Notifications & Badges",
+        badge: "Alerts",
+        title: "Phone Notification Center & Alerts",
+        summary: "Receive incoming message alerts in your phone's Notification Center alongside unread badges.",
+        steps: [
+          "Allow notification permission when prompted (or enable it from the Chats banner or Profile > Notification Center).",
+          "Incoming messages post to your phone Notification Center when the chat isn't open, and tapping a notification opens that conversation directly.",
+          "Use 'Send Test Notification' in Profile to verify Notification Center delivery, or toggle system notifications on/off anytime."
+        ],
+        tip: "Unread counts appear on each chat row and as a green badge on the Chats navigation tab."
+      },
+      {
+        category: "Search & Details",
+        badge: "Directory",
+        title: "Global Search & Contact Info",
+        summary: "Find people by name, @username, email, or phone number and inspect rich Contact Info.",
+        steps: [
+          "Tap the person-search icon in the Chats top bar for quick global lookup, or use the Contacts tab.",
+          "Inside any chat, tap the top bar title to open Contact / Group Info with copyable email/phone, shared media, and chat management."
+        ],
+        tip: "Keep your phone number updated in Profile > Profile Details so contacts can reach you quickly."
+      },
+      {
+        category: "Chat Management",
+        badge: "Controls",
+        title: "Clearing History & Deleting Chats",
+        summary: "Long-press conversations to clear message history or delete chats cleanly.",
+        steps: [
+          "Long-press any chat card in the Chats tab (or open the menu inside a chat) to Clear Chat History or Delete Chat.",
+          "Confirmation dialogs protect against accidental deletion."
+        ],
+        tip: "Clearing history removes messages while keeping the conversation thread active."
+      },
+      {
+        category: "Privacy & Safety",
+        badge: "Compliance",
+        title: "Privacy, Blocking & Compliance",
+        summary: "Control Read Receipts, Last Seen presence, blocked contacts, compliance reports, and account deletion.",
+        steps: [
+          "Go to Profile > Privacy Controls to toggle Read Receipts and Online & Last Seen Presence.",
+          "Inside a 1-on-1 chat menu, tap Block Contact or Report to SAT Compliance.",
+          "Manage blocked users or permanently delete your account from the Profile screen."
+        ],
+        tip: "Compliance reports are logged securely to a restricted Firestore collection."
+      },
+      {
+        category: "Downloads & Updates",
+        badge: "Distribution",
+        title: "Downloads, Updates & Sideloading",
+        summary: "Install SAT Messenger cleanly from GitHub Releases, Obtainium, Play Store, or verified mirrors.",
+        steps: [
+          "Download the latest APK or AAB directly from the GitHub Releases page (sat-messenger-release.apk for production or sat-messenger-debug.apk for QA).",
+          "When sideloading an APK outside an app store, enable 'Install unknown apps' for your browser or file manager when Android prompts.",
+          "Track automatic updates via Obtainium by adding https://github.com/SAT-Limited-Organization/SAT-Messenger, and verify downloaded packages against SHA256SUMS.txt.",
+          "Check your currently installed version number anytime at the bottom of your Profile screen."
+        ],
+        tip: "Keep the same signing keystore across upgrades so Android installs updates cleanly without uninstalling existing local data."
+      }
+    ];
+
+    const categories = ["All", ...new Set(MANUAL_SECTIONS.map(s => s.category))];
+    let selectedCategory = "All";
+    let searchQuery = "";
+
+    const chipsEl = document.getElementById("categoryChips");
+    const gridEl = document.getElementById("manualGrid");
+    const emptyEl = document.getElementById("emptyState");
+    const searchEl = document.getElementById("manualSearch");
+
+    function renderChips() {
+      chipsEl.innerHTML = "";
+      categories.forEach(cat => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip" + (cat === selectedCategory ? " active" : "");
+        btn.textContent = cat;
+        btn.addEventListener("click", () => {
+          selectedCategory = cat;
+          renderChips();
+          renderSections();
+        });
+        chipsEl.appendChild(btn);
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function renderSections() {
+      const q = searchQuery.trim().toLowerCase();
+      const filtered = MANUAL_SECTIONS.filter(s => {
+        const matchCat = selectedCategory === "All" || s.category === selectedCategory;
+        const matchQuery = !q ||
+          s.title.toLowerCase().includes(q) ||
+          s.category.toLowerCase().includes(q) ||
+          s.summary.toLowerCase().includes(q) ||
+          s.steps.some(step => step.toLowerCase().includes(q)) ||
+          (s.tip && s.tip.toLowerCase().includes(q));
+        return matchCat && matchQuery;
+      });
+
+      gridEl.innerHTML = "";
+      emptyEl.style.display = filtered.length === 0 ? "block" : "none";
+
+      filtered.forEach(sec => {
+        const card = document.createElement("article");
+        card.className = "card";
+        const stepsHtml = sec.steps.map(st => `<li>${escapeHtml(st)}</li>`).join("");
+        const tipHtml = sec.tip ? `<div class="manual-tip"><strong>Tip:</strong> ${escapeHtml(sec.tip)}</div>` : "";
+        card.innerHTML = `
+          <h3>
+            <span>${escapeHtml(sec.title)}</span>
+            <span class="pill teal">${escapeHtml(sec.badge)}</span>
+          </h3>
+          <p><strong>${escapeHtml(sec.category)}:</strong> ${escapeHtml(sec.summary)}</p>
+          <ol>${stepsHtml}</ol>
+          ${tipHtml}
+        `;
+        gridEl.appendChild(card);
+      });
+    }
+
+    searchEl.addEventListener("input", e => {
+      searchQuery = e.target.value;
+      renderSections();
+    });
+
+    renderChips();
+    renderSections();
+  </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture, Firestore &amp; CI/CD — SAT Messenger</title>
+  <meta name="description" content="Technical architecture, Cloud Firestore schema, zero-trust security rules, CI/CD release pipeline, and GitHub Pages publishing guide for SAT Messenger." />
+  <link rel="icon" type="image/jpeg" href="assets/sat-messenger-logo.jpg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-inner" aria-label="Primary Navigation">
+      <a class="brand" href="index.html">
+        <img src="assets/sat-messenger-logo.jpg" alt="SAT Messenger Logo" />
+        <span>SAT Messenger</span>
+        <span class="brand-tag">Architecture</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html">Overview &amp; Downloads</a>
+        <a href="manual.html">User Manual</a>
+        <a href="architecture.html" class="active">Architecture &amp; CI/CD</a>
+        <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <img class="hero-logo" src="assets/sat-messenger-logo.jpg" alt="SAT Messenger App Icon" />
+      <div>
+        <h1>Architecture, Firestore Schema &amp; CI/CD</h1>
+        <p>
+          SAT Messenger follows <strong>MVVM + Clean Repository Architecture</strong> using reactive Kotlin
+          <code>StateFlow</code> pipelines, Jetpack Compose Material 3, Firebase AI Logic, and zero-trust Cloud Firestore security rules.
+        </p>
+        <div class="badge-row">
+          <span class="pill teal">MVVM + Clean Repositories</span>
+          <span class="pill blue">Zero-Trust Firestore Rules</span>
+          <span class="pill green">GitHub Actions Automated Releases</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>Project Structure</h2>
+        <span class="section-subtitle">Source layout across Kotlin packages, Firebase config, and documentation</span>
+      </div>
+      <pre><code>├── .github/workflows/
+│   └── release-apk.yml               # Automated APK/AAB build &amp; GitHub Release publisher
+├── docs/                             # GitHub Pages static documentation &amp; Web User Manual
+│   ├── assets/sat-messenger-logo.jpg # Branded app logo asset
+│   ├── index.html                    # Main GitHub Pages landing &amp; download portal
+│   ├── manual.html                   # Interactive web User Manual (19 searchable sections)
+│   ├── architecture.html             # Technical architecture, Firestore schema &amp; CI/CD docs
+│   ├── styles.css                    # SAT Limited Navy &amp; Teal theme stylesheet
+│   └── README.md                     # Markdown documentation index
+├── app/
+│   ├── build.gradle.kts              # Android app build config &amp; dependencies
+│   ├── google-services.json          # Firebase client configuration (project sat-limited)
+│   └── src/main/java/com/example/
+│       ├── MainActivity.kt           # Edge-to-edge host, lifecycle presence &amp; permissions
+│       ├── audio/                    # VoiceRecorderManager &amp; VoicePlayerManager
+│       ├── data/
+│       │   ├── model/                # Firestore models &amp; AvailabilityStatus
+│       │   └── repository/           # Auth, User, Chat, SocialFeatures, Invite &amp; SatAi repositories
+│       ├── notifications/            # AppNotificationManager &amp; notification channels
+│       ├── util/                     # App Check init &amp; MediaAttachmentHelper
+│       └── ui/
+│           ├── components/           # MessageBubble, VoiceComposer, Avatars &amp; Status pills
+│           ├── screens/              # AI, Auth, Chats, Chat/Details, Contacts, Channels, Communities, Status, Profile, Search, Dialogs, Manual
+│           ├── theme/                # Material 3 color scheme &amp; typography
+│           └── viewmodel/            # MessengerViewModel
+├── firebase-blueprint.json           # Firestore schema &amp; security architecture blueprint
+├── firestore.rules                   # Zero-trust Firestore security rules
+└── firestore.test.js                 # Node emulator security rule tests</code></pre>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>Cloud Firestore Collections</h2>
+        <span class="section-subtitle">Defined in <code>firebase-blueprint.json</code> and enforced in <code>firestore.rules</code></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Collection Path</th>
+              <th>Entity</th>
+              <th>Purpose &amp; Access Model</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>/users/{userId}</code></td>
+              <td><code>UserProfile</code></td>
+              <td>Public colleague directory, live availability status, online flag, and <code>lastSeen</code> timestamp; owner-writable.</td>
+            </tr>
+            <tr>
+              <td><code>/users/{userId}/contacts/{contactId}</code></td>
+              <td><code>ContactEntry</code></td>
+              <td>Private bookmarked Friends &amp; Colleagues list scoped strictly to the owning user.</td>
+            </tr>
+            <tr>
+              <td><code>/users/{userId}/settings/privacy</code></td>
+              <td><code>PrivacySettings</code></td>
+              <td>Read receipts and last-seen visibility toggles, readable/writable only by <code>userId</code>.</td>
+            </tr>
+            <tr>
+              <td><code>/users/{userId}/blocked/{blockedId}</code></td>
+              <td><code>BlockedUser</code></td>
+              <td>Blocked contact records scoped to the owning user.</td>
+            </tr>
+            <tr>
+              <td><code>/chats/{chatId}</code> &amp; <code>/messages/{messageId}</code></td>
+              <td><code>Chat</code>, <code>Message</code></td>
+              <td>Direct and group conversations with <code>memberIds</code> gating, typing flags, reactions, voice clips, media, and read receipts.</td>
+            </tr>
+            <tr>
+              <td><code>/chatRooms/{roomId}</code></td>
+              <td><code>ChatRoom</code></td>
+              <td>Departmental group rooms with <code>memberIds</code>, <code>adminIds</code>, and protected <code>createdBy</code> admin delegation.</td>
+            </tr>
+            <tr>
+              <td><code>/statuses/{statusId}</code></td>
+              <td><code>StatusItem</code></td>
+              <td>24-hour ephemeral text, photo, and video stories with viewer tracking.</td>
+            </tr>
+            <tr>
+              <td><code>/channels/{channelId}</code> &amp; <code>/posts/{postId}</code></td>
+              <td><code>Channel</code>, <code>ChannelPost</code></td>
+              <td>Flexible public or invite-only broadcast channels with follower posting settings and verified admin promotion.</td>
+            </tr>
+            <tr>
+              <td><code>/communities/{communityId}</code></td>
+              <td><code>Community</code></td>
+              <td>Umbrella communities linking subgroup rooms with creator-protected admin promotion.</td>
+            </tr>
+            <tr>
+              <td><code>/reports/{reportId}</code></td>
+              <td><code>Report</code></td>
+              <td>Abuse and compliance reports restricted to authenticated submission.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>Publishing This Documentation on GitHub Pages</h2>
+        <span class="section-subtitle">Serve <code>/docs</code> directly via GitHub repository settings</span>
+      </div>
+      <div class="card">
+        <h3>Enable GitHub Pages</h3>
+        <ol>
+          <li>Push the repository (including the <code>docs/</code> directory) to GitHub on <code>main</code> or <code>master</code>.</li>
+          <li>Open <strong>Settings → Pages</strong> in <code>SAT-Limited-Organization/SAT-Messenger</code>.</li>
+          <li>Under <strong>Build and deployment → Source</strong>, choose <strong>Deploy from a branch</strong>.</li>
+          <li>Select branch <strong><code>main</code></strong> (or <strong><code>master</code></strong>) and folder <strong><code>/docs</code></strong>, then click <strong>Save</strong>.</li>
+          <li>Your site goes live at <code>https://sat-limited-organization.github.io/SAT-Messenger/</code>.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <strong>SAT Messenger</strong> · <a href="index.html">Overview &amp; Downloads</a> ·
+      <a href="manual.html">User Manual</a>
+    </p>
+  </footer>
+</body>
+</html>

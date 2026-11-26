@@ -1,6 +1,8 @@
 package com.example.ui.screens.auth
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -184,7 +186,15 @@ fun SignInScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                if (authState is AuthUiState.Error) {
+                    ErrorCard(
+                        message = authState.message,
+                        onDismiss = onDismissError
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                } else {
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
 
                 // Sign-In Card
                 Card(
@@ -223,7 +233,7 @@ fun SignInScreen(
 
                         OutlinedButton(
                             onClick = {
-                                (context as? Activity)?.let { onGoogleSignInClick(it) }
+                                context.findActivity()?.let { onGoogleSignInClick(it) }
                             },
                             enabled = !isLoading,
                             shape = RoundedCornerShape(14.dp),
@@ -262,14 +272,6 @@ fun SignInScreen(
                             }
                         }
                     }
-                }
-
-                if (authState is AuthUiState.Error) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    ErrorCard(
-                        message = authState.message,
-                        onDismiss = onDismissError
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -413,4 +415,10 @@ private fun GoogleLogoMark(modifier: Modifier = Modifier) {
             cap = StrokeCap.Butt
         )
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
