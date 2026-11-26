@@ -15,4 +15,15 @@
     <string name="contacts_title">Contacts &amp; Availability</string>
     <string name="registration_manual_button">App Manual &amp; User Guide</string>
     <string name="registration_manual_subtitle">Learn about sign-in, contacts, chats, voice clips &amp; privacy</string>
+    <string name="settings_updates_title">App Updates &amp; Version</string>
+    <string name="settings_installed_version_label">Installed Version</string>
+    <string name="settings_latest_version_label">Latest GitHub Release</string>
+    <string name="settings_check_updates_action">Check for Updates</string>
+    <string name="settings_checking_updates_action">Checking GitHub…</string>
+    <string name="settings_download_update_action">Download Update</string>
+    <string name="settings_view_release_notes_action">Release Notes</string>
+    <string name="update_dialog_title">New Version Available</string>
+    <string name="update_dialog_download">Download &amp; Install</string>
+    <string name="update_dialog_github">View on GitHub</string>
+    <string name="update_dialog_later">Later</string>
 </resources>

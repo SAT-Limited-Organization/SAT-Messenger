@@ -71,6 +71,8 @@ import com.example.data.model.AvailabilityStatus
 import com.example.data.model.BlockedUser
 import com.example.data.model.PrivacySettings
 import com.example.data.model.UserProfile
+import com.example.data.repository.AppReleaseInfo
+import com.example.data.repository.AppUpdateUiState
 import com.example.ui.components.AvailabilityStatusPill
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.availabilityColor
@@ -98,6 +100,10 @@ fun ProfileScreen(
     onToggleSystemNotifications: (Boolean) -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
     onSendTestNotification: () -> Unit = {},
+    appUpdateState: AppUpdateUiState = AppUpdateUiState.Idle(BuildConfig.VERSION_NAME),
+    onCheckForUpdates: () -> Unit = {},
+    onOpenUpdatePrompt: () -> Unit = {},
+    onDownloadUpdate: (AppReleaseInfo) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -122,7 +128,7 @@ fun ProfileScreen(
                 },
                 title = {
                     Text(
-                        text = "My Profile & Security",
+                        text = "Profile & Settings",
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -589,6 +595,16 @@ fun ProfileScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // App Updates & Version Card
+                AppUpdateCard(
+                    updateState = appUpdateState,
+                    onCheckForUpdates = onCheckForUpdates,
+                    onOpenUpdatePrompt = onOpenUpdatePrompt,
+                    onDownloadUpdate = onDownloadUpdate
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 

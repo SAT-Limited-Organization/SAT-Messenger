@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -73,8 +74,10 @@ import com.example.ui.screens.dialogs.JoinInviteLinkDialog
 import com.example.ui.screens.dialogs.NewChatDialog
 import com.example.ui.screens.dialogs.ReportDialog
 import com.example.ui.screens.dialogs.ShareInviteLinkDialog
+import com.example.data.repository.AppUpdateUiState
 import com.example.ui.screens.manual.AppManualScreen
 import com.example.ui.screens.profile.ProfileScreen
+import com.example.ui.screens.profile.UpdatePromptDialog
 import com.example.ui.screens.search.UserSearchDialog
 import com.example.ui.theme.SATMessengerTheme
 import com.example.ui.theme.SatOnlineGreen
@@ -140,6 +143,8 @@ class MainActivity : ComponentActivity() {
                 val satAiUiState by viewModel.satAiUiState.collectAsState()
                 val satAiMode by viewModel.satAiMode.collectAsState()
                 val satAiWebGroundingEnabled by viewModel.satAiWebGroundingEnabled.collectAsState()
+                val appUpdateState by viewModel.appUpdateState.collectAsState()
+                val showUpdatePromptDialog by viewModel.showUpdatePromptDialog.collectAsState()
 
                 val snackbarHostState = remember { SnackbarHostState() }
                 val lifecycleOwner = LocalLifecycleOwner.current
@@ -164,6 +169,21 @@ class MainActivity : ComponentActivity() {
                         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                     }
                     context.startActivity(settingsIntent)
+                }
+
+                val openExternalUrl: (String) -> Unit = { url ->
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    }.onFailure {
+                        Toast.makeText(
+                            context,
+                            "Unable to open link in browser.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
 
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -455,6 +475,12 @@ class MainActivity : ComponentActivity() {
                                             } else {
                                                 requestNotificationPermission()
                                             }
+                                        },
+                                        appUpdateState = appUpdateState,
+                                        onCheckForUpdates = { viewModel.checkForAppUpdates(userInitiated = true) },
+                                        onOpenUpdatePrompt = { viewModel.openUpdatePromptDialog() },
+                                        onDownloadUpdate = { release ->
+                                            openExternalUrl(release.apkDownloadUrl ?: release.releasePageUrl)
                                         }
                                     )
                                 }
@@ -589,6 +615,25 @@ class MainActivity : ComponentActivity() {
                                     onDismiss = { viewModel.closeJoinInviteDialog() },
                                     onLookup = { viewModel.lookupInviteCode(it) },
                                     onConfirmJoin = { viewModel.confirmJoinInvite(it) }
+                                )
+                            }
+
+                            val availableUpdate = (appUpdateState as? AppUpdateUiState.UpdateAvailable)?.latestRelease
+                            if (showUpdatePromptDialog && availableUpdate != null) {
+                                UpdatePromptDialog(
+                                    installedVersion = appUpdateState.installedVersion,
+                                    release = availableUpdate,
+                                    onDownloadUpdate = { release ->
+                                        viewModel.dismissUpdatePromptDialog(rememberForThisVersion = false)
+                                        openExternalUrl(release.apkDownloadUrl ?: release.releasePageUrl)
+                                    },
+                                    onOpenGitHubRelease = { release ->
+                                        viewModel.dismissUpdatePromptDialog(rememberForThisVersion = false)
+                                        openExternalUrl(release.releasePageUrl)
+                                    },
+                                    onDismiss = { rememberForVersion ->
+                                        viewModel.dismissUpdatePromptDialog(rememberForThisVersion = rememberForVersion)
+                                    }
                                 )
                             }
 

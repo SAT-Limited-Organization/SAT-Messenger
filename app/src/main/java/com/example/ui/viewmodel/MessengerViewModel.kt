@@ -17,6 +17,9 @@ import com.example.data.model.Message
 import com.example.data.model.PrivacySettings
 import com.example.data.model.StatusItem
 import com.example.data.model.UserProfile
+import com.example.BuildConfig
+import com.example.data.repository.AppUpdateRepository
+import com.example.data.repository.AppUpdateUiState
 import com.example.data.repository.AuthRepository
 import com.example.data.repository.AuthUiState
 import com.example.data.repository.ChatRepository
@@ -57,7 +60,8 @@ class MessengerViewModel(
     private val socialRepository: SocialFeaturesRepository = SocialFeaturesRepository(context),
     private val inviteRepository: InviteRepository = InviteRepository(context),
     private val appNotificationManager: AppNotificationManager = AppNotificationManager(context),
-    private val satAiRepository: SatAiRepository = SatAiRepository()
+    private val satAiRepository: SatAiRepository = SatAiRepository(),
+    private val appUpdateRepository: AppUpdateRepository = AppUpdateRepository()
 ) : ViewModel() {
 
     private val notificationPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -182,11 +186,21 @@ class MessengerViewModel(
     private val _satAiWebGroundingEnabled = MutableStateFlow(true)
     val satAiWebGroundingEnabled: StateFlow<Boolean> = _satAiWebGroundingEnabled.asStateFlow()
 
+    // App Version Check & Update states
+    private val _appUpdateState = MutableStateFlow<AppUpdateUiState>(
+        AppUpdateUiState.Idle(BuildConfig.VERSION_NAME)
+    )
+    val appUpdateState: StateFlow<AppUpdateUiState> = _appUpdateState.asStateFlow()
+
+    private val _showUpdatePromptDialog = MutableStateFlow(false)
+    val showUpdatePromptDialog: StateFlow<Boolean> = _showUpdatePromptDialog.asStateFlow()
+
     private var messagesJob: Job? = null
     private var chatsJob: Job? = null
     private var profileJob: Job? = null
     private var activeChatJob: Job? = null
     private var satAiJob: Job? = null
+    private var updateCheckJob: Job? = null
     private val chatMessageListeners = mutableMapOf<String, Job>()
 
     init {
@@ -226,6 +240,10 @@ class MessengerViewModel(
                     isOnline = true
                 )
             )
+        }
+
+        if (_appUpdateState.value is AppUpdateUiState.Idle) {
+            checkForAppUpdates(userInitiated = false)
         }
 
         // Observe own profile
@@ -443,6 +461,9 @@ class MessengerViewModel(
 
     fun navigateTo(screen: ScreenState) {
         _currentScreen.value = screen
+        if (screen == ScreenState.PROFILE && _appUpdateState.value is AppUpdateUiState.Idle) {
+            checkForAppUpdates(userInitiated = false)
+        }
     }
 
     fun openChat(chat: Chat) {
@@ -1309,6 +1330,57 @@ class MessengerViewModel(
         }
     }
 
+    fun checkForAppUpdates(userInitiated: Boolean = true) {
+        if (_appUpdateState.value is AppUpdateUiState.Checking) return
+        val installed = BuildConfig.VERSION_NAME
+        _appUpdateState.value = AppUpdateUiState.Checking(installedVersion = installed)
+
+        updateCheckJob?.cancel()
+        updateCheckJob = viewModelScope.launch {
+            val resultState = appUpdateRepository.checkForUpdate(
+                installedVersion = installed,
+                isDebugBuild = BuildConfig.DEBUG
+            )
+            _appUpdateState.value = resultState
+
+            when (resultState) {
+                is AppUpdateUiState.UpdateAvailable -> {
+                    val dismissedTag = notificationPrefs.getString(KEY_DISMISSED_UPDATE_TAG, null)
+                    if (userInitiated || dismissedTag != resultState.latestRelease.tagName) {
+                        _showUpdatePromptDialog.value = true
+                    }
+                }
+                is AppUpdateUiState.UpToDate -> {
+                    if (userInitiated) {
+                        _toastMessage.value = "You are on the latest version (v$installed)."
+                    }
+                }
+                is AppUpdateUiState.Error -> {
+                    if (userInitiated) {
+                        _toastMessage.value = resultState.message
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    fun openUpdatePromptDialog() {
+        if (_appUpdateState.value is AppUpdateUiState.UpdateAvailable) {
+            _showUpdatePromptDialog.value = true
+        }
+    }
+
+    fun dismissUpdatePromptDialog(rememberForThisVersion: Boolean = true) {
+        _showUpdatePromptDialog.value = false
+        val currentState = _appUpdateState.value
+        if (rememberForThisVersion && currentState is AppUpdateUiState.UpdateAvailable) {
+            notificationPrefs.edit()
+                .putString(KEY_DISMISSED_UPDATE_TAG, currentState.latestRelease.tagName)
+                .apply()
+        }
+    }
+
     fun clearToast() {
         _toastMessage.value = null
     }
@@ -1316,5 +1388,6 @@ class MessengerViewModel(
     private companion object {
         const val PREFS_NAME = "sat_notification_prefs"
         const val KEY_SYSTEM_NOTIFICATIONS_ENABLED = "system_notifications_enabled"
+        const val KEY_DISMISSED_UPDATE_TAG = "dismissed_update_tag"
     }
 }

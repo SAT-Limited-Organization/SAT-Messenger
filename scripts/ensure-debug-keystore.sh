@@ -7,9 +7,9 @@ BASE64_FILE="${ROOT_DIR}/debug.keystore.base64"
 
 if [ ! -f "$KEYSTORE_FILE" ]; then
   if [ -n "${DEBUG_KEYSTORE_BASE64:-}" ]; then
-    printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+    printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d '\r\n\t ' | base64 -d > "$KEYSTORE_FILE"
   elif [ -f "$BASE64_FILE" ]; then
-    base64 -d "$BASE64_FILE" > "$KEYSTORE_FILE"
+    tr -d '\r\n\t ' < "$BASE64_FILE" | base64 -d > "$KEYSTORE_FILE"
   else
     keytool -genkeypair -v \
       -keystore "$KEYSTORE_FILE" \

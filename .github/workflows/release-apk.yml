@@ -90,8 +90,10 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ]; then
-            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > my-upload-key.jks
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '\r\n\t ' | base64 -d > my-upload-key.jks
             chmod 600 my-upload-key.jks
+            RELEASE_SHA1=$(keytool -list -v -keystore my-upload-key.jks -storepass "$STORE_PASSWORD" -alias upload | sed -n 's/.*SHA1:[[:space:]]*//p' | head -n1 | tr -d ':' | tr '[:upper:]' '[:lower:]')
+            echo "Verified release keystore alias 'upload' (SHA-1: ${RELEASE_SHA1})"
             export KEYSTORE_PATH="${PWD}/my-upload-key.jks"
             gradle :app:assembleRelease :app:bundleRelease
             echo "has_release=true" >> "$GITHUB_OUTPUT"
