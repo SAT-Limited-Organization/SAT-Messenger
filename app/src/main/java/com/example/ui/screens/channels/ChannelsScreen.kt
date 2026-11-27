@@ -1029,28 +1029,37 @@ fun ChannelFeedDialog(
                     )
                 }
             }
-        }
-    }
-
-    if (showSettingsDialog) {
-        ChannelSettingsDialog(
-            channel = channel,
-            isCreator = isCreator,
-            onDismiss = { showSettingsDialog = false },
-            onSave = { name, desc, cat, isPublic, allowFollowerPosts, allowReactions ->
-                onUpdateChannelSettings(name, desc, cat, isPublic, allowFollowerPosts, allowReactions)
-                showSettingsDialog = false
-            },
-            onUpdateIcon = onUpdateChannelIcon,
-            onOpenManageAdmins = {
-                showSettingsDialog = false
-                showAdminsDialog = true
-            },
-            onDeleteChannel = {
-                showSettingsDialog = false
-                onDeleteChannel()
+            if (showSettingsDialog) {
+                BackHandler { showSettingsDialog = false }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clickable { showSettingsDialog = false }
+                        .padding(20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ChannelSettingsDialog(
+                        channel = channel,
+                        isCreator = isCreator,
+                        onDismiss = { showSettingsDialog = false },
+                        onSave = { name, desc, cat, isPublic, allowFollowerPosts, allowReactions ->
+                            onUpdateChannelSettings(name, desc, cat, isPublic, allowFollowerPosts, allowReactions)
+                            showSettingsDialog = false
+                        },
+                        onUpdateIcon = onUpdateChannelIcon,
+                        onOpenManageAdmins = {
+                            showSettingsDialog = false
+                            showAdminsDialog = true
+                        },
+                        onDeleteChannel = {
+                            showSettingsDialog = false
+                            onDeleteChannel()
+                        }
+                    )
+                }
             }
-        )
+        }
     }
 
     if (!fullScreenImage.isNullOrBlank()) {
@@ -1352,15 +1361,14 @@ private fun ChannelSettingsDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
-        ) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = false, onClick = {})
+    ) {
             Column(
                 modifier = Modifier
                     .padding(20.dp)
@@ -1562,7 +1570,6 @@ private fun ChannelSettingsDialog(
                 }
             }
         }
-    }
 
     if (showDeleteConfirm) {
         AlertDialog(

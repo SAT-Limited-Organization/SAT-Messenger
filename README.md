@@ -127,6 +127,7 @@ The app follows **MVVM** + **Clean Repository Architecture** with reactive Kotli
 │   ├── index.html                    # Landing page, downloads & full app docs
 │   ├── manual.html                   # Interactive searchable web User Manual
 │   ├── architecture.html             # Architecture, Firestore schema & CI/CD docs
+│   ├── privacy.html                  # Privacy Policy (data usage, security, user rights)
 │   └── README.md                     # Markdown documentation index
 ├── app/
 │   ├── build.gradle.kts              # Android app build config & dependencies
