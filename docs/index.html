@@ -14,7 +14,7 @@
       <a class="brand" href="index.html">
         <img src="assets/sat-messenger-logo.jpg" alt="SAT Messenger Logo" />
         <span>SAT Messenger</span>
-        <span class="brand-tag">v2.2.07.11.2026.14.5.0</span>
+        <span class="brand-tag">v4.2.07.11.2026.14.5.1</span>
       </a>
       <div class="nav-links">
         <a href="index.html" class="active">Overview &amp; Downloads</a>
@@ -40,7 +40,7 @@
           <span class="pill blue">Kotlin 2.2.10 · Compose M3</span>
           <span class="pill teal">Firebase Auth &amp; Firestore</span>
           <span class="pill">App ID: <code>com.aistudio.satmessenger.satlim</code></span>
-          <span class="pill">Version <code>2.2.07.11.2026.14.5.0</code> (Build 2)</span>
+          <span class="pill">Version <code>4.2.07.11.2026.14.5.1</code> (Build 5)</span>
         </div>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://github.com/SAT-Limited-Organization/SAT-Messenger/releases/latest/download/sat-messenger-release.apk">
@@ -120,8 +120,8 @@
           <h3>Package Identity</h3>
           <ul>
             <li><strong>Application ID:</strong> <code>com.aistudio.satmessenger.satlim</code></li>
-            <li><strong>Version Name:</strong> <code>2.2.07.11.2026.14.5.0</code></li>
-            <li><strong>Version Code:</strong> <code>2</code></li>
+            <li><strong>Version Name:</strong> <code>4.2.07.11.2026.14.5.1</code></li>
+            <li><strong>Version Code:</strong> <code>5</code></li>
             <li><strong>Android Support:</strong> <code>minSdk 24</code> (Android 7.0) to <code>targetSdk 36</code></li>
           </ul>
         </div>
@@ -152,15 +152,15 @@
           <h3>Sideloading &amp; Obtainium Auto-Updates</h3>
           <ul>
             <li><strong>GitHub Releases (Direct APK):</strong> Download <code>sat-messenger-release.apk</code> (or <code>sat-messenger-debug.apk</code>) on Android, tap the file, and allow <em>"Install unknown apps"</em> for your browser or file manager when prompted.</li>
-            <li><strong>Obtainium Auto-Updates:</strong> Add <code>https://github.com/SAT-Limited-Organization/SAT-Messenger</code> in Obtainium to track versioned releases (<code>v2.2.07.11.2026.14.5.0</code>, etc.) and install updates with one tap.</li>
+            <li><strong>Obtainium Auto-Updates:</strong> Add <code>https://github.com/SAT-Limited-Organization/SAT-Messenger</code> in Obtainium to track versioned releases (<code>v4.2.07.11.2026.14.5.1</code>, etc.) and install updates with one tap.</li>
             <li><strong>Upgrade Continuity:</strong> Keep the same signing keystore across upgrades so Android installs updates cleanly without uninstalling existing local data.</li>
           </ul>
         </div>
         <div class="card">
-          <h3>Verify Download Integrity</h3>
+          <h3>Verify Download Integrity &amp; In-App Check</h3>
           <p>Verify any downloaded APK or App Bundle against the release's <code>SHA256SUMS.txt</code> manifest:</p>
           <pre><code>sha256sum -c SHA256SUMS.txt</code></pre>
-          <p>You can also confirm your currently installed version and build number anytime at the bottom of the in-app <strong>Profile</strong> screen.</p>
+          <p>You can also check for new GitHub Releases or confirm your installed version anytime inside the in-app <strong>Profile &amp; Settings</strong> screen.</p>
         </div>
       </div>
     </section>
@@ -181,11 +181,11 @@
         </div>
 
         <div class="card">
-          <h3>Contacts &amp; Real-Time Availability <span class="pill green">Live Sync</span></h3>
+          <h3>Contacts, Find Friends &amp; Real-Time Availability <span class="pill green">Live Sync</span></h3>
           <ul>
-            <li><strong>Firestore-Synced Contact Directory:</strong> Syncs registered user profiles in real time under <code>users/{userId}</code>.</li>
+            <li><strong>Find Friends via Device Contacts:</strong> Match saved contacts (<code>ContactsContract</code>) by email or phone number against registered SAT Messenger accounts.</li>
             <li><strong>Live Availability Statuses:</strong> Broadcast and view <code>Available</code>, <code>Busy</code>, <code>Away</code>, <code>In a Meeting</code>, <code>Do Not Disturb</code>, and <code>Offline</code> (with relative <em>Last seen</em> timestamps).</li>
-            <li><strong>Friends &amp; Filtering:</strong> Star/unstar favorite contacts into <code>/users/{userId}/contacts/{contactId}</code>, filter by <strong>All</strong>, <strong>Online</strong>, <strong>Friends</strong>, or <strong>Colleagues</strong>, and search by name, <code>@handle</code>, email, or phone.</li>
+            <li><strong>Two-Way Friend Requests &amp; 5-Field Search:</strong> Send/accept friend requests and search by Registered Name, Email, Phone Number, Primary <code>@username</code>, or Secondary <code>@username</code>.</li>
           </ul>
         </div>
 
@@ -209,8 +209,9 @@
         </div>
 
         <div class="card">
-          <h3>Admin Promotion, Channels, Communities &amp; Status <span class="pill teal">Governance</span></h3>
+          <h3>Icons, Admin Promotion, Channels, Communities &amp; Status <span class="pill teal">Governance</span></h3>
           <ul>
+            <li><strong>Profile, Group, Channel &amp; Community Icons:</strong> Customize or remove Profile photos, Group Room icons, Channel icons, and Community icons using Android's zero-permission Photo Picker.</li>
             <li><strong>Admin Promotion (Groups, Channels &amp; Communities):</strong> Creators and existing admins can promote or dismiss fellow members as Admins, backed by Cloud Firestore security rules that protect creators.</li>
             <li><strong>Flexible Broadcast Channels:</strong> Public or invite-only channels with custom categories, follower posting toggles, reactions, and admin management.</li>
             <li><strong>Communities &amp; Invite Links:</strong> Group departmental rooms and an announcements hub under communities; share/reset deep links (<code>satmessenger://invite/&lt;code&gt;</code> and <code>https://satmessenger.app/invite/&lt;code&gt;</code>).</li>
@@ -372,6 +373,7 @@ firebase emulators:exec --only auth,firestore --project demo-no-project \
       <strong>SAT Messenger</strong> · SAT Limited Organization ·
       <a href="manual.html">User Manual</a> ·
       <a href="architecture.html">Architecture &amp; CI/CD</a> ·
+      <a href="privacy.html">Privacy Policy</a> ·
       <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub</a>
     </p>
   </footer>

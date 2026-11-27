@@ -1,6 +1,11 @@
 package com.example.ui.screens.communities
 
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,8 +22,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -26,8 +33,10 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
@@ -49,11 +58,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.data.model.Chat
 import com.example.data.model.Community
 import com.example.data.model.UserProfile
@@ -69,6 +82,10 @@ import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
 import com.example.ui.theme.SatTeal
+import com.example.util.MediaAttachmentHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun CommunitiesScreen(
@@ -78,14 +95,17 @@ fun CommunitiesScreen(
     directoryUsers: List<UserProfile> = emptyList(),
     onOpenChat: (Chat) -> Unit,
     onCreateCommunity: (name: String, description: String?, subgroups: List<String>) -> Unit,
+    onCreateCommunityWithIcon: ((name: String, description: String?, iconUrl: String?, subgroups: List<String>) -> Unit)? = null,
     onJoinCommunity: (String) -> Unit,
     onShareCommunityInvite: (Community) -> Unit = {},
     onOpenJoinInvite: () -> Unit = {},
     onToggleCommunityAdmin: (communityId: String, targetUserId: String, makeAdmin: Boolean) -> Unit = { _, _, _ -> },
+    onUpdateCommunityIcon: (communityId: String, iconUrl: String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var activeAdminsCommunityId by remember { mutableStateOf<String?>(null) }
+    var activeIconCommunityId by remember { mutableStateOf<String?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
     Scaffold(
@@ -232,15 +252,30 @@ fun CommunitiesScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             // Community Header
+                            val isCommunityAdmin = community.creatorId == currentUserId || community.adminIds.contains(currentUserId)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
                                         .size(48.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(SatElectricBlue),
+                                        .background(SatElectricBlue)
+                                        .then(
+                                            if (isCommunityAdmin) {
+                                                Modifier.clickable { activeIconCommunityId = community.id }
+                                            } else Modifier
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+                                    if (!community.iconUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = community.iconUrl,
+                                            contentDescription = community.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+                                    }
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -250,6 +285,18 @@ fun CommunitiesScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                                if (isCommunityAdmin) {
+                                    IconButton(
+                                        onClick = { activeIconCommunityId = community.id },
+                                        modifier = Modifier.testTag("community_edit_icon_${community.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoCamera,
+                                            contentDescription = "Edit Community Icon",
+                                            tint = SatTeal
+                                        )
+                                    }
                                 }
                                 IconButton(
                                     onClick = { activeAdminsCommunityId = community.id },
@@ -384,16 +431,163 @@ fun CommunitiesScreen(
                 }
             }
         }
+        activeIconCommunityId?.let { cid ->
+            communities.firstOrNull { it.id == cid }?.let { community ->
+                BackHandler { activeIconCommunityId = null }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clickable { activeIconCommunityId = null }
+                        .padding(20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CommunityIconEditorCard(
+                        community = community,
+                        onUpdateIcon = { iconUrl ->
+                            onUpdateCommunityIcon(community.id, iconUrl)
+                        },
+                        onDismiss = { activeIconCommunityId = null }
+                    )
+                }
+            }
+        }
     }
 
     if (showCreateDialog) {
         CreateCommunityDialog(
             onDismiss = { showCreateDialog = false },
-            onCreate = { name, desc, subgroups ->
-                onCreateCommunity(name, desc, subgroups)
+            onCreate = { name, desc, iconUrl, subgroups ->
+                if (onCreateCommunityWithIcon != null) {
+                    onCreateCommunityWithIcon(name, desc, iconUrl, subgroups)
+                } else {
+                    onCreateCommunity(name, desc, subgroups)
+                }
                 showCreateDialog = false
             }
         )
+    }
+}
+
+@Composable
+private fun CommunityIconEditorCard(
+    community: Community,
+    onUpdateIcon: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isProcessing by remember { mutableStateOf(false) }
+
+    val iconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            isProcessing = true
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                isProcessing = false
+                if (encoded != null) {
+                    onUpdateIcon(encoded)
+                } else {
+                    Toast.makeText(context, "Could not compress community icon under cloud size limit.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = false, onClick = {})
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Community Icon",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(SatElectricBlue),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!community.iconUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = community.iconUrl,
+                        contentDescription = community.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = community.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    iconPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                enabled = !isProcessing,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("community_change_icon_button")
+            ) {
+                Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isProcessing) "Updating..." else "Change Community Icon")
+            }
+
+            if (!community.iconUrl.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onUpdateIcon(null) },
+                    enabled = !isProcessing,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("community_remove_icon_button")
+                ) {
+                    Icon(imageVector = Icons.Default.DeleteOutline, contentDescription = null, tint = SatErrorRed, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Remove Icon", color = SatErrorRed)
+                }
+            }
+        }
     }
 }
 
@@ -560,12 +754,32 @@ private fun CommunityAdminsCard(
 @Composable
 private fun CreateCommunityDialog(
     onDismiss: () -> Unit,
-    onCreate: (name: String, desc: String?, subgroups: List<String>) -> Unit
+    onCreate: (name: String, desc: String?, iconUrl: String?, subgroups: List<String>) -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var communityName by remember { mutableStateOf("") }
     var communityDesc by remember { mutableStateOf("") }
+    var communityIconUrl by remember { mutableStateOf<String?>(null) }
     var newSubgroupName by remember { mutableStateOf("") }
     val subgroups = remember { mutableStateListOf("General Discussion", "Mission Operations") }
+
+    val communityIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                if (encoded != null) {
+                    communityIconUrl = encoded
+                } else {
+                    Toast.makeText(context, "Could not process selected community icon.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -576,7 +790,11 @@ private fun CreateCommunityDialog(
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -588,7 +806,55 @@ private fun CreateCommunityDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(SatElectricBlue),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!communityIconUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = communityIconUrl,
+                                contentDescription = "Community Icon Preview",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            communityIconPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("create_community_pick_icon_button")
+                    ) {
+                        Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (communityIconUrl != null) "Change Icon" else "Pick Community Icon")
+                    }
+                    if (communityIconUrl != null) {
+                        IconButton(
+                            onClick = { communityIconUrl = null },
+                            modifier = Modifier.testTag("create_community_remove_icon_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.DeleteOutline, contentDescription = "Remove community icon", tint = SatErrorRed)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = communityName,
@@ -663,7 +929,7 @@ private fun CreateCommunityDialog(
 
                 Button(
                     onClick = {
-                        onCreate(communityName, communityDesc.ifBlank { null }, subgroups.toList())
+                        onCreate(communityName, communityDesc.ifBlank { null }, communityIconUrl, subgroups.toList())
                     },
                     enabled = communityName.isNotBlank(),
                     shape = RoundedCornerShape(12.dp),

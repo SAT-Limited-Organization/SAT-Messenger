@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — SAT Messenger</title>
+  <meta name="description" content="Official Privacy Policy for SAT Messenger (com.aistudio.satmessenger.satlim) detailing data usage, zero-trust security practices, and user rights." />
+  <link rel="icon" type="image/jpeg" href="assets/sat-messenger-logo.jpg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-inner" aria-label="Primary Navigation">
+      <a class="brand" href="index.html">
+        <img src="assets/sat-messenger-logo.jpg" alt="SAT Messenger Logo" />
+        <span>SAT Messenger</span>
+        <span class="brand-tag">Privacy Policy</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html">Overview &amp; Downloads</a>
+        <a href="manual.html">User Manual</a>
+        <a href="architecture.html">Architecture &amp; CI/CD</a>
+        <a href="privacy.html" class="active">Privacy Policy</a>
+        <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <img class="hero-logo" src="assets/sat-messenger-logo.jpg" alt="SAT Messenger App Icon" />
+      <div>
+        <h1>SAT Messenger Privacy Policy</h1>
+        <p>
+          How <strong>SAT Limited</strong> collects, processes, protects, and puts you in control of your information across
+          <strong>SAT Messenger</strong> (<code>com.aistudio.satmessenger.satlim</code>).
+        </p>
+        <div class="badge-row">
+          <span class="pill teal">Effective: November 27, 2026</span>
+          <span class="pill blue">Version <code>4.2.07.11.2026.14.5.1</code> (Build 5)</span>
+          <span class="pill green">Zero-Trust Cloud Firestore</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="jump-bar" aria-label="On-page sections">
+      <a href="#data-usage">1. Data Usage</a>
+      <a href="#security-practices">2. Security Practices</a>
+      <a href="#user-rights">3. User Rights &amp; Controls</a>
+      <a href="#permissions-transparency">4. Permission Transparency</a>
+      <a href="#contact">5. Governance Contact</a>
+    </div>
+
+    <section id="data-usage" class="section">
+      <div class="section-header">
+        <h2>1. Data Usage</h2>
+        <span class="section-subtitle">What information is processed and why it is needed to operate SAT Messenger</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Account &amp; Directory Profile <span class="pill blue">Identity</span></h3>
+          <ul>
+            <li><strong>Google Identity Sign-In:</strong> Authenticates your account via Jetpack <code>CredentialManager</code> and Firebase Authentication, receiving your UID, display name, email address, and profile photo.</li>
+            <li><strong>Profile &amp; Usernames:</strong> Stores your display name, primary <code>@username</code> (email prefix), optional secondary <code>@username</code>, optional phone number, status message, avatar, live availability state, and <code>lastSeen</code> timestamp in <code>/users/{userId}</code> so colleagues and friends can find and reach you.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Messaging, Media, Voice &amp; Communities <span class="pill teal">Collaboration</span></h3>
+          <ul>
+            <li><strong>Conversations &amp; Broadcasts:</strong> Direct chats, group rooms, channels, communities, emoji reactions, read receipts, typing flags, and 24-hour status stories are synced via Cloud Firestore solely to deliver real-time communication to authorized participants.</li>
+            <li><strong>Media &amp; Icons:</strong> Profile photos, group/channel/community icons, chat attachments, and status media selected through the Android Photo Picker are compressed on-device and synced to authorized conversation or group members.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Device Contacts Discovery (Find Friends) <span class="pill green">Opt-In</span></h3>
+          <ul>
+            <li><strong>Explicit User Action Only:</strong> Device contacts (<code>ContactsContract</code>) are scanned only after you grant <code>READ_CONTACTS</code> permission and tap <strong>Find</strong> in the Contacts directory.</li>
+            <li><strong>Minimal Correlation:</strong> Normalized phone numbers and email addresses are matched against registered SAT Messenger users to display existing friends on your device; unmatched personal contacts are never uploaded or stored in Cloud Firestore.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>SAT Limited AI &amp; Update Checks <span class="pill">Services</span></h3>
+          <ul>
+            <li><strong>SAT Limited AI:</strong> Prompts, selected modes (Smart, Fast, Reasoning), optional Google Search grounding queries, and user-selected images are sent through Firebase AI Logic exclusively when you interact with the assistant.</li>
+            <li><strong>In-App Version Check:</strong> Checking for updates in <strong>Profile &amp; Settings</strong> fetches public release metadata from GitHub Releases and compares your installed <code>versionName</code> locally.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="security-practices" class="section">
+      <div class="section-header">
+        <h2>2. Security Practices</h2>
+        <span class="section-subtitle">Technical and organizational safeguards protecting enterprise communications</span>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <h3>Zero-Trust Firestore Rules</h3>
+          <ul>
+            <li>All database reads and writes require verified Google authentication (anonymous authentication is strictly disabled).</li>
+            <li>Private subcollections (<code>contacts</code>, <code>settings/privacy</code>, <code>blocked</code>) are strictly scoped to the owning <code>userId</code>.</li>
+            <li>Group rooms, channels, and communities enforce membership checks, creator protection, and admin-only role/icon updates server-side.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>App Check &amp; Encrypted Transport</h3>
+          <ul>
+            <li>Requests to Firebase AI Logic and backend services are attested using <strong>Firebase App Check</strong> to prevent unauthorized API abuse.</li>
+            <li>No API secrets are hardcoded in application source code; all network communication with Firebase and GitHub uses HTTPS/TLS encryption in transit.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Least-Privilege Architecture</h3>
+          <ul>
+            <li>Zero broad storage permissions: photo and video selection uses Android's zero-permission <code>PickVisualMedia</code> picker.</li>
+            <li>Abuse and compliance reports are isolated inside a restricted <code>/reports</code> collection for authorized governance review.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="user-rights" class="section">
+      <div class="section-header">
+        <h2>3. User Rights &amp; Controls</h2>
+        <span class="section-subtitle">Manage visibility, customize data, revoke access, or delete your account anytime</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Presence, Receipts &amp; Profile Control</h3>
+          <ul>
+            <li><strong>Privacy Toggles:</strong> Enable or disable <strong>Read Receipts</strong> and <strong>Online &amp; Last Seen Presence</strong> anytime under <strong>Profile &amp; Settings → Privacy Controls</strong>.</li>
+            <li><strong>Edit or Remove Data:</strong> Change or remove your profile photo, phone number, availability status, and secondary <code>@username</code> (up to 3 edits per active day with a 10-day cooldown); admins may update or remove group, channel, and community icons at any time.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Blocking, History Clearing &amp; Erasure</h3>
+          <ul>
+            <li><strong>Safety Controls:</strong> Block or unblock contacts, clear message history, delete chats, or submit compliance reports directly from conversations and Profile settings.</li>
+            <li><strong>Account Deletion:</strong> Permanently delete your SAT Messenger account, profile record, and private settings immediately via <strong>Profile &amp; Settings → Delete Account &amp; Clear Profile</strong>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="permissions-transparency" class="section">
+      <div class="section-header">
+        <h2>4. Android Permission Transparency</h2>
+        <span class="section-subtitle">Only permissions directly tied to user-initiated features are declared</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>Requirement</th>
+              <th>Purpose &amp; Revocation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>INTERNET</code> / <code>ACCESS_NETWORK_STATE</code></td>
+              <td>Install-time</td>
+              <td>Real-time Cloud Firestore sync, Google authentication, SAT Limited AI, and GitHub Release version checks.</td>
+            </tr>
+            <tr>
+              <td><code>READ_CONTACTS</code></td>
+              <td>Runtime (Opt-In)</td>
+              <td>Optional <strong>Find Friends</strong> device contact correlation; revocable anytime in Android App Settings.</td>
+            </tr>
+            <tr>
+              <td><code>RECORD_AUDIO</code></td>
+              <td>Runtime (Opt-In)</td>
+              <td>Requested only when tapping the microphone to record voice notes; revocable anytime in Android App Settings.</td>
+            </tr>
+            <tr>
+              <td><code>POST_NOTIFICATIONS</code></td>
+              <td>Runtime (Android 13+)</td>
+              <td>Posts incoming message alerts to the Notification Center; toggleable in-app or in system settings.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="contact" class="section">
+      <div class="section-header">
+        <h2>5. Governance &amp; Privacy Inquiries</h2>
+        <span class="section-subtitle">Questions, compliance requests, and policy updates</span>
+      </div>
+      <div class="callout">
+        For questions regarding SAT Limited data governance, security practices, or account deletion assistance, open an inquiry through the
+        <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger/issues" target="_blank" rel="noopener noreferrer">SAT Messenger Repository</a>
+        or consult the in-app <strong>App Manual &amp; User Guide</strong>.
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <strong>SAT Messenger</strong> · SAT Limited Organization ·
+      <a href="index.html">Overview &amp; Downloads</a> ·
+      <a href="manual.html">User Manual</a> ·
+      <a href="architecture.html">Architecture &amp; CI/CD</a> ·
+      <a href="privacy.html">Privacy Policy</a> ·
+      <a href="https://github.com/SAT-Limited-Organization/SAT-Messenger" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </p>
+  </footer>
+</body>
+</html>

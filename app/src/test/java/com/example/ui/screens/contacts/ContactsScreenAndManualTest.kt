@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
+import com.example.BuildConfig
 import com.example.data.model.AvailabilityStatus
 import com.example.data.model.ContactEntry
 import com.example.data.model.UserProfile
@@ -195,6 +196,15 @@ class ContactsScreenAndManualTest {
         composeRule.onNodeWithTag("manual_search_field").performTextInput("Obtainium")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Downloads, Updates & Sideloading").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("manual_search_field").performTextClearance()
+        composeRule.onNodeWithTag("manual_search_field").performTextInput("Community Icons")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Profile, Group, Channel & Community Icons").assertIsDisplayed()
+        composeRule.onNodeWithTag("manual_app_version_text").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Version ${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+        ).assertIsDisplayed()
     }
 }
 

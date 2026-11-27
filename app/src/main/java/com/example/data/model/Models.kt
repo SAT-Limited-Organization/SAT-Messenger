@@ -26,6 +26,12 @@ data class UserProfile(
     val userId: String = "",
     val displayName: String = "",
     val email: String = "",
+    val primaryUsername: String = "",
+    val secondaryUsername: String? = null,
+    val secondaryUsernameLower: String? = null,
+    val secondaryUsernameDayKey: String? = null,
+    val secondaryUsernameChangesInDay: Int = 0,
+    val secondaryUsernameLastChangedAtMs: Long? = null,
     val phoneNumber: String? = null,
     val avatarUrl: String? = null,
     val statusMessage: String? = "Available",
@@ -37,20 +43,30 @@ data class UserProfile(
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 ) {
+    val resolvedPrimaryUsername: String
+        get() = primaryUsername.trim().takeIf { it.isNotBlank() }
+            ?: email.substringBefore("@").trim()
+
+    val primaryUsernameHandle: String
+        get() = when {
+            resolvedPrimaryUsername.isNotBlank() -> "@$resolvedPrimaryUsername"
+            userId.isNotBlank() -> "@user_${userId.take(6)}"
+            else -> "@user"
+        }
+
+    val secondaryUsernameHandle: String?
+        get() = secondaryUsername?.trim()?.takeIf { it.isNotBlank() }?.let { "@$it" }
+
     val username: String
         get() = when {
             displayName.isNotBlank() -> displayName
-            email.isNotBlank() -> email.substringBefore("@")
+            resolvedPrimaryUsername.isNotBlank() -> resolvedPrimaryUsername
             userId.isNotBlank() -> "user_${userId.take(6)}"
             else -> "User"
         }
 
     val usernameHandle: String
-        get() = when {
-            email.isNotBlank() -> "@${email.substringBefore("@")}"
-            userId.isNotBlank() -> "@user_${userId.take(6)}"
-            else -> "@user"
-        }
+        get() = primaryUsernameHandle
 
     fun resolvedAvailability(): AvailabilityStatus {
         return AvailabilityStatus.fromLabel(availabilityStatus, isOnline)
@@ -65,6 +81,27 @@ data class ContactEntry(
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )
+
+@IgnoreExtraProperties
+data class FriendRequest(
+    val id: String = "",
+    val fromUserId: String = "",
+    val fromUserName: String = "",
+    val fromUserAvatarUrl: String? = null,
+    val toUserId: String = "",
+    val toUserName: String = "",
+    val toUserAvatarUrl: String? = null,
+    val participantIds: List<String> = emptyList(),
+    val status: String = "pending", // "pending", "accepted", "declined"
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+) {
+    companion object {
+        fun pairId(userA: String, userB: String): String {
+            return listOf(userA, userB).sorted().joinToString("_")
+        }
+    }
+}
 
 @IgnoreExtraProperties
 data class PrivacySettings(
@@ -87,6 +124,7 @@ data class Chat(
     val type: String = "direct", // "direct" or "group"
     val name: String? = null,
     val description: String? = null,
+    val iconUrl: String? = null,
     val inviteCode: String? = null,
     val memberIds: List<String> = emptyList(),
     val adminIds: List<String> = emptyList(),
@@ -139,6 +177,7 @@ data class ChatRoom(
     val id: String = "",
     val name: String = "",
     val description: String? = null,
+    val iconUrl: String? = null,
     val inviteCode: String? = null,
     val memberIds: List<String> = emptyList(),
     val adminIds: List<String> = emptyList(),
@@ -156,6 +195,7 @@ data class ChatRoom(
         type = "group",
         name = name,
         description = description,
+        iconUrl = iconUrl,
         inviteCode = inviteCode,
         memberIds = memberIds,
         adminIds = adminIds,

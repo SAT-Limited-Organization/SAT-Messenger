@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
@@ -80,6 +81,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatNavyDark
 import com.example.ui.theme.SatOnlineGreen
@@ -120,13 +122,13 @@ private val MANUAL_SECTIONS = listOf(
         title = "Contacts Sync & Real-Time Availability",
         icon = Icons.Default.People,
         badge = "Live Sync",
-        summary = "View all Firestore-synced friends and colleagues with real-time online status and availability badges.",
+        summary = "Discover registered SAT Messenger users saved in your phone contacts, send friend requests, and view live availability.",
         steps = listOf(
             "Tap the 'Contacts' tab on the bottom navigation bar to open your live contact directory.",
-            "Set your own real-time availability at the top ('Available', 'Busy', 'Away', 'In a Meeting', or 'Do Not Disturb') — changes sync instantly to other users.",
-            "Filter contacts by All, Online, Friends, or Colleagues, or search by name, @handle, email, phone, or availability.",
-            "Tap the Star icon next to any contact to add or remove them from your personal Friends list.",
-            "Tap any contact row to inspect their live availability, Last Seen timestamp, email, or phone number, or tap Message to open a chat."
+            "Tap 'Find' on the Device Contacts card to grant Contacts permission and automatically highlight registered SAT Messenger users saved on your phone.",
+            "Send friend requests by tapping the Star/Add icon on any user (or from Profile/Search) and accept or decline incoming requests in the Requests filter.",
+            "Filter contacts by All, Online, Friends, On Device, Requests, or Colleagues, and search by registered name, @primary/@secondary username, email, phone number, or availability.",
+            "Set your own real-time availability at the top ('Available', 'Busy', 'Away', 'In a Meeting', or 'Do Not Disturb')."
         ),
         tips = listOf(
             "Green = Available, Blue = In a Meeting, Amber = Away, Red = Busy / Do Not Disturb, Gray = Offline with relative Last Seen time."
@@ -349,16 +351,18 @@ private val MANUAL_SECTIONS = listOf(
     ManualSection(
         id = "search_and_contact_details",
         category = "Search & Details",
-        title = "Global Search & Contact Info",
+        title = "Global Search, Usernames & Contact Info",
         icon = Icons.Default.Phone,
         badge = "Directory",
-        summary = "Find people by name, @username, email, or phone number and inspect rich Contact Info.",
+        summary = "Search registered users by Registered Name, Email, Phone Number, Primary Username, or Secondary Username.",
         steps = listOf(
-            "Tap the person-search icon in the Chats top bar for quick global lookup, or use the Contacts tab.",
+            "Your Primary Username comes automatically from the part of your email before '@'.",
+            "In Profile & Settings > SAT Messenger Usernames, claim any unpicked Secondary Username. Once set, you can change it up to 3 times on an active change day, followed by a 10-day cooldown.",
+            "Tap the person-search icon in the Chats top bar (or use Contacts / New Chat) to search by name, email, phone number, primary @username, or secondary @username.",
             "Inside any chat, tap the top bar title to open Contact / Group Info with copyable email/phone, shared media, and chat management."
         ),
         tips = listOf(
-            "Keep your phone number updated in Profile > Profile Details so contacts can reach you quickly."
+            "Keep your phone number updated in Profile > Profile Details so device contact discovery can match you."
         )
     ),
     ManualSection(
@@ -393,17 +397,34 @@ private val MANUAL_SECTIONS = listOf(
         )
     ),
     ManualSection(
+        id = "profile_and_entity_icons",
+        category = "Icons & Photos",
+        title = "Profile, Group, Channel & Community Icons",
+        icon = Icons.Default.PhotoCamera,
+        badge = "Customization",
+        summary = "Customize or remove photos and icons for your Profile, Group Rooms, Channels, and Communities.",
+        steps = listOf(
+            "Profile Photo: Open Profile & Settings, tap your avatar camera badge or 'Change Photo', and pick any image via the zero-permission Photo Picker (or tap 'Remove' to revert to initials).",
+            "Group Room Icon: Pick a group icon while creating a room in '+' > New Group, or open Group Info as a group admin and tap 'Change Group Icon' / 'Remove Icon'.",
+            "Channel Icon: Choose a channel icon during creation or open Channel Settings as a channel admin to change or remove it.",
+            "Community Icon: Pick an icon when starting a community, or tap the Camera icon button on any community card you admin to change or remove its icon."
+        ),
+        tips = listOf(
+            "Images are compressed automatically and synced across all members in Cloud Firestore without broad storage permissions."
+        )
+    ),
+    ManualSection(
         id = "downloads_and_updates",
         category = "Downloads & Updates",
         title = "Downloads, Updates & Sideloading",
         icon = Icons.Default.Download,
         badge = "Distribution",
-        summary = "Install SAT Messenger cleanly from GitHub Releases, Obtainium, Play Store, or verified mirrors.",
+        summary = "Install SAT Messenger cleanly from GitHub Releases, Obtainium, Play Store, or verified mirrors and check updates in-app.",
         steps = listOf(
             "Download the latest APK or AAB directly from the GitHub Releases page (sat-messenger-release.apk for production or sat-messenger-debug.apk for QA).",
             "When sideloading an APK outside an app store, enable 'Install unknown apps' for your browser or file manager when Android prompts.",
             "Track automatic updates via Obtainium by adding the GitHub repository URL, and verify downloaded packages against SHA256SUMS.txt.",
-            "Check your currently installed version number anytime at the bottom of your Profile screen."
+            "Check your currently installed version (v${BuildConfig.VERSION_NAME}, Build ${BuildConfig.VERSION_CODE}) or tap 'Check for Updates' anytime inside Profile & Settings > App Updates."
         ),
         tips = listOf(
             "Keep the same signing keystore across upgrades so Android installs updates cleanly without uninstalling existing local data."
@@ -435,6 +456,7 @@ fun AppManualScreen(
         "Communities",
         "Status & Updates",
         "Media & Files",
+        "Icons & Photos",
         "Notifications & Badges",
         "Search & Details",
         "Chat Management",
@@ -538,9 +560,24 @@ fun AppManualScreen(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = SatTeal.copy(alpha = 0.22f)
+                        ) {
+                            Text(
+                                text = "Version ${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SatTeal,
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .testTag("manual_app_version_text")
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Everything you need to know about Google sign-in, SAT Limited AI, live contact availability, direct & group chats, admin promotion, voice clips, photo & video media sharing, invite links, flexible channels, phone notifications, and privacy.",
+                            text = "Everything you need to know about Google sign-in, SAT Limited AI, live contact availability, Find Friends, direct & group chats, profile/group/channel/community icons, admin promotion, voice clips, media sharing, invite links, flexible channels, notifications, and in-app updates.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.8f)
                         )

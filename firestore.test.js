@@ -607,4 +607,257 @@ test("Video media messages: chat member can send type video attachment, non-memb
   );
 });
 
+test("Usernames: valid primary/secondary usernames accepted, daily count > 3 rejected", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const pastDate = new Date(Date.now() - 1000);
 
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      displayName: "Alice Smith",
+      email: "alice@satlimited.com",
+      primaryUsername: "alice",
+      secondaryUsername: "alice_sat",
+      secondaryUsernameLower: "alice_sat",
+      secondaryUsernameDayKey: "2026-11-27",
+      secondaryUsernameChangesInDay: 2,
+      secondaryUsernameLastChangedAtMs: Date.now(),
+      isOnline: true,
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    })
+  );
+
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      secondaryUsernameChangesInDay: 4,
+    })
+  );
+});
+
+test("Status updates: viewer can update viewerIds only, non-owner cannot edit text", async () => {
+  const createdAt = new Date(Date.now() - 1000);
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("statuses").doc("status_1").set({
+      id: "status_1",
+      userId: ALICE_UID,
+      userName: "Alice",
+      text: "Orbital telemetry online",
+      viewerIds: [],
+      createdAt,
+    });
+  });
+
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  await assertSucceeds(
+    bobDb.collection("statuses").doc("status_1").update({
+      viewerIds: [BOB_UID],
+    })
+  );
+
+  await assertFails(
+    bobDb.collection("statuses").doc("status_1").update({
+      text: "Tampered caption",
+    })
+  );
+});
+
+test("Friend requests: sender creates pending, recipient accepts, third party denied", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const charlieDb = testEnv.authenticatedContext(CHARLIE_UID).firestore();
+  const pairId = [ALICE_UID, BOB_UID].sort().join("_");
+  const pastDate = new Date(Date.now() - 1000);
+
+  // Sender cannot create an already accepted friend request
+  await assertFails(
+    aliceDb.collection("friendRequests").doc(pairId).set({
+      id: pairId,
+      fromUserId: ALICE_UID,
+      fromUserName: "Alice",
+      toUserId: BOB_UID,
+      toUserName: "Bob",
+      participantIds: [ALICE_UID, BOB_UID],
+      status: "accepted",
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    })
+  );
+
+  // Alice sends pending friend request to Bob
+  await assertSucceeds(
+    aliceDb.collection("friendRequests").doc(pairId).set({
+      id: pairId,
+      fromUserId: ALICE_UID,
+      fromUserName: "Alice",
+      toUserId: BOB_UID,
+      toUserName: "Bob",
+      participantIds: [ALICE_UID, BOB_UID],
+      status: "pending",
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    })
+  );
+
+  // Alice (sender) cannot accept her own outgoing request
+  await assertFails(
+    aliceDb.collection("friendRequests").doc(pairId).update({
+      status: "accepted",
+      updatedAt: new Date(),
+    })
+  );
+
+  // Charlie cannot read or accept Alice/Bob's friend request
+  await assertFails(charlieDb.collection("friendRequests").doc(pairId).get());
+  await assertFails(
+    charlieDb.collection("friendRequests").doc(pairId).update({
+      status: "accepted",
+      updatedAt: new Date(),
+    })
+  );
+
+  // Bob (recipient) accepts the friend request
+  await assertSucceeds(
+    bobDb.collection("friendRequests").doc(pairId).update({
+      status: "accepted",
+      updatedAt: new Date(),
+    })
+  );
+
+  // Either participant can delete/unfriend
+  await assertSucceeds(aliceDb.collection("friendRequests").doc(pairId).delete());
+});
+
+test("Profile, Group, Channel, and Community icons: authorized users can set and clear iconUrl/avatarUrl", async () => {
+  const pastDate = new Date(Date.now() - 1000);
+  const sampleIcon = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/";
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await db.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      displayName: "Alice Smith",
+      email: "alice@satlimited.com",
+      isOnline: true,
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    });
+    await db.collection("chatRooms").doc("room_icons").set({
+      id: "room_icons",
+      name: "Launch Ops",
+      memberIds: [ALICE_UID, BOB_UID],
+      adminIds: [ALICE_UID],
+      createdBy: ALICE_UID,
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    });
+    await db.collection("channels").doc("chan_icons").set({
+      id: "chan_icons",
+      name: "SAT Updates",
+      category: "News",
+      isPublic: true,
+      allowFollowerPosts: false,
+      allowReactions: true,
+      creatorId: ALICE_UID,
+      adminIds: [ALICE_UID],
+      subscriberIds: [ALICE_UID, BOB_UID],
+      followerCount: 2,
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    });
+    await db.collection("communities").doc("comm_icons").set({
+      id: "comm_icons",
+      name: "SAT Ops",
+      creatorId: ALICE_UID,
+      adminIds: [ALICE_UID],
+      memberIds: [ALICE_UID, BOB_UID],
+      subgroupChatIds: [],
+      createdAt: pastDate,
+      updatedAt: pastDate,
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const charlieDb = testEnv.authenticatedContext(CHARLIE_UID).firestore();
+
+  // Profile avatar set & clear
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      avatarUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      avatarUrl: null,
+      updatedAt: new Date(),
+    })
+  );
+  await assertFails(
+    bobDb.collection("users").doc(ALICE_UID).update({
+      avatarUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+
+  // Group chat room icon set & clear
+  await assertSucceeds(
+    aliceDb.collection("chatRooms").doc("room_icons").update({
+      iconUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("chatRooms").doc("room_icons").update({
+      iconUrl: null,
+      updatedAt: new Date(),
+    })
+  );
+  await assertFails(
+    charlieDb.collection("chatRooms").doc("room_icons").update({
+      iconUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+
+  // Channel icon set & clear (admin only)
+  await assertSucceeds(
+    aliceDb.collection("channels").doc("chan_icons").update({
+      iconUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("channels").doc("chan_icons").update({
+      iconUrl: null,
+      updatedAt: new Date(),
+    })
+  );
+  await assertFails(
+    bobDb.collection("channels").doc("chan_icons").update({
+      iconUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+
+  // Community icon set & clear (admin only)
+  await assertSucceeds(
+    aliceDb.collection("communities").doc("comm_icons").update({
+      iconUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("communities").doc("comm_icons").update({
+      iconUrl: null,
+      updatedAt: new Date(),
+    })
+  );
+  await assertFails(
+    bobDb.collection("communities").doc("comm_icons").update({
+      iconUrl: sampleIcon,
+      updatedAt: new Date(),
+    })
+  );
+});

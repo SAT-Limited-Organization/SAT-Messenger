@@ -41,14 +41,14 @@ class SocialFeaturesRepository(private val db: FirebaseFirestore) {
 
     fun observeStatuses(): Flow<List<StatusItem>> {
         val path = "statuses"
-        val now = Timestamp.now()
         return db.collection("statuses")
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .snapshots()
             .map { snapshot ->
+                val nowSeconds = Timestamp.now().seconds
                 snapshot.toObjects(StatusItem::class.java).filter { status ->
                     // Exclude statuses that expired (24 hours)
-                    status.expiresAt == null || status.expiresAt.seconds > now.seconds
+                    status.expiresAt == null || status.expiresAt.seconds > nowSeconds
                 }
             }
             .catch { error ->
@@ -68,20 +68,26 @@ class SocialFeaturesRepository(private val db: FirebaseFirestore) {
         val statusId = UUID.randomUUID().toString()
         val path = "statuses/$statusId"
         return try {
+            val cleanText = text?.trim()?.takeIf { it.isNotBlank() }
+            val cleanMedia = mediaUrl?.trim()?.takeIf { it.isNotBlank() }
+            if (cleanText == null && cleanMedia == null) {
+                return Result.failure(IllegalArgumentException("Enter status text or attach media before sharing."))
+            }
+            val safeUserName = userName.trim().ifBlank { "SAT Member" }.take(100)
             val nowMs = System.currentTimeMillis()
             val expiresAtDate = Date(nowMs + 24 * 60 * 60 * 1000L) // 24 hours later
             val payload = mutableMapOf<String, Any>(
                 "id" to statusId,
                 "userId" to uid,
-                "userName" to userName,
+                "userName" to safeUserName,
                 "viewerIds" to emptyList<String>(),
                 "createdAt" to FieldValue.serverTimestamp(),
                 "expiresAt" to Timestamp(expiresAtDate)
             )
-            userAvatarUrl?.let { payload["userAvatarUrl"] = it }
-            text?.let { payload["text"] = it }
-            mediaUrl?.let { payload["mediaUrl"] = it }
-            backgroundColor?.let { payload["backgroundColor"] = it }
+            userAvatarUrl?.takeIf { it.isNotBlank() }?.let { payload["userAvatarUrl"] = it }
+            cleanText?.let { payload["text"] = it.take(1000) }
+            cleanMedia?.let { payload["mediaUrl"] = it }
+            backgroundColor?.takeIf { it.isNotBlank() }?.let { payload["backgroundColor"] = it.take(20) }
 
             db.collection("statuses").document(statusId).set(payload).await()
             Result.success(statusId)
@@ -92,7 +98,7 @@ class SocialFeaturesRepository(private val db: FirebaseFirestore) {
     }
 
     suspend fun markStatusViewed(statusId: String): Result<Unit> {
-        val uid = requireUserId()
+        val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("Not authenticated"))
         val path = "statuses/$statusId"
         return try {
             db.collection("statuses").document(statusId)
@@ -223,6 +229,34 @@ class SocialFeaturesRepository(private val db: FirebaseFirestore) {
                     // Best-effort sync of invite metadata
                 }
             }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateChannelIcon(channelId: String, iconUrl: String?): Result<Unit> {
+        val uid = requireUserId()
+        val path = "channels/$channelId"
+        return try {
+            val docRef = db.collection("channels").document(channelId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalArgumentException("Channel not found."))
+            }
+            val creatorId = snapshot.getString("creatorId").orEmpty()
+            val adminIds = (snapshot.get("adminIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            if (uid != creatorId && !adminIds.contains(uid)) {
+                return Result.failure(IllegalStateException("Only channel admins can update the channel icon."))
+            }
+            val cleanIcon = iconUrl?.trim()?.takeIf { it.isNotBlank() }
+            docRef.update(
+                mapOf(
+                    "iconUrl" to (cleanIcon ?: FieldValue.delete()),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
             Result.success(Unit)
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, path)
@@ -526,6 +560,34 @@ class SocialFeaturesRepository(private val db: FirebaseFirestore) {
                 mapOf(
                     "adminIds" to updatedAdmins,
                     "memberIds" to updatedMembers,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateCommunityIcon(communityId: String, iconUrl: String?): Result<Unit> {
+        val uid = requireUserId()
+        val path = "communities/$communityId"
+        return try {
+            val docRef = db.collection("communities").document(communityId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalArgumentException("Community not found."))
+            }
+            val creatorId = snapshot.getString("creatorId").orEmpty()
+            val adminIds = (snapshot.get("adminIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            if (uid != creatorId && !adminIds.contains(uid)) {
+                return Result.failure(IllegalStateException("Only community admins can update the community icon."))
+            }
+            val cleanIcon = iconUrl?.trim()?.takeIf { it.isNotBlank() }
+            docRef.update(
+                mapOf(
+                    "iconUrl" to (cleanIcon ?: FieldValue.delete()),
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()

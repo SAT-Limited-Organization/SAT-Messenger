@@ -69,6 +69,7 @@ import com.example.ui.screens.auth.SignInScreen
 import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.chats.ChatListScreen
 import com.example.ui.screens.channels.ChannelFeedDialog
+import com.example.ui.screens.contacts.FindFriendsScreen
 import com.example.ui.screens.conversation.ConversationScreen
 import com.example.ui.screens.dialogs.JoinInviteLinkDialog
 import com.example.ui.screens.dialogs.NewChatDialog
@@ -145,6 +146,13 @@ class MainActivity : ComponentActivity() {
                 val satAiWebGroundingEnabled by viewModel.satAiWebGroundingEnabled.collectAsState()
                 val appUpdateState by viewModel.appUpdateState.collectAsState()
                 val showUpdatePromptDialog by viewModel.showUpdatePromptDialog.collectAsState()
+                val friendRequests by viewModel.friendRequests.collectAsState()
+                val deviceContactMatches by viewModel.deviceContactMatches.collectAsState()
+                val isSyncingDeviceContacts by viewModel.isSyncingDeviceContacts.collectAsState()
+                val hasDeviceContactsPermission by viewModel.hasDeviceContactsPermission.collectAsState()
+                val deviceContactsScannedCount by viewModel.deviceContactsScannedCount.collectAsState()
+                val findFriendsDirectoryState by viewModel.findFriendsDirectoryState.collectAsState()
+                val secondaryUsernameFeedback by viewModel.secondaryUsernameFeedback.collectAsState()
 
                 val snackbarHostState = remember { SnackbarHostState() }
                 val lifecycleOwner = LocalLifecycleOwner.current
@@ -347,6 +355,9 @@ class MainActivity : ComponentActivity() {
                                         onCreateCommunity = { name, desc, subgroups ->
                                             viewModel.createCommunity(name, desc, subgroups)
                                         },
+                                        onCreateCommunityWithIcon = { name, desc, iconUrl, subgroups ->
+                                            viewModel.createCommunity(name, desc, subgroups, iconUrl)
+                                        },
                                         onJoinCommunity = { commId ->
                                             viewModel.joinCommunity(commId)
                                         },
@@ -358,6 +369,9 @@ class MainActivity : ComponentActivity() {
                                                 targetDescription = community.description,
                                                 existingCode = community.inviteCode
                                             )
+                                        },
+                                        onUpdateCommunityIcon = { communityId, iconUrl ->
+                                            viewModel.updateCommunityIcon(communityId, iconUrl)
                                         },
                                         onOpenJoinInvite = {
                                             viewModel.openJoinInviteDialog()
@@ -380,6 +394,16 @@ class MainActivity : ComponentActivity() {
                                         onToggleCommunityAdmin = { communityId, targetUserId, makeAdmin ->
                                             viewModel.setCommunityAdminRole(communityId, targetUserId, makeAdmin)
                                         },
+                                        friendRequests = friendRequests,
+                                        deviceContactMatches = deviceContactMatches,
+                                        isSyncingDeviceContacts = isSyncingDeviceContacts,
+                                        hasDeviceContactsPermission = hasDeviceContactsPermission,
+                                        deviceContactsScannedCount = deviceContactsScannedCount,
+                                        onSyncDeviceContacts = { viewModel.syncDeviceContacts(context, silent = false) },
+                                        onOpenFindFriends = { viewModel.openFindFriends() },
+                                        onSendFriendRequest = { targetUser -> viewModel.sendFriendRequest(targetUser) },
+                                        onRespondToFriendRequest = { req, accept -> viewModel.respondToFriendRequest(req, accept) },
+                                        onCancelOrRemoveFriend = { targetUser -> viewModel.cancelOrRemoveFriend(targetUser) },
                                         showNotificationPermissionBanner = !hasNotificationPermission && !notificationBannerDismissed,
                                         onEnableNotificationsClick = requestNotificationPermission,
                                         onDismissNotificationBanner = { notificationBannerDismissed = true }
@@ -435,6 +459,11 @@ class MainActivity : ComponentActivity() {
                                                 { targetUserId, makeAdmin ->
                                                     viewModel.setGroupAdminRole(chat.id, targetUserId, makeAdmin)
                                                 }
+                                            } else null,
+                                            onUpdateGroupIcon = if (chat.type == "group") {
+                                                { iconUrl ->
+                                                    viewModel.updateGroupIcon(chat.id, iconUrl)
+                                                }
                                             } else null
                                         )
                                     } ?: run {
@@ -451,6 +480,13 @@ class MainActivity : ComponentActivity() {
                                         onUpdateProfile = { name, status, phone ->
                                             viewModel.updateProfile(name, status, phone)
                                         },
+                                        onUpdateAvatar = { avatarUrl ->
+                                            viewModel.updateProfileAvatar(avatarUrl)
+                                        },
+                                        onUpdateSecondaryUsername = { rawUsername ->
+                                            viewModel.updateSecondaryUsername(rawUsername)
+                                        },
+                                        secondaryUsernameFeedback = secondaryUsernameFeedback,
                                         onUpdateAvailability = { status ->
                                             viewModel.updateAvailabilityStatus(status)
                                         },
@@ -507,10 +543,36 @@ class MainActivity : ComponentActivity() {
                                         onDismissError = { viewModel.dismissSatAiError() }
                                     )
                                 }
+
+                                ScreenState.FIND_FRIENDS -> {
+                                    FindFriendsScreen(
+                                        currentUserId = uid,
+                                        directoryState = findFriendsDirectoryState,
+                                        savedContacts = savedContacts,
+                                        friendRequests = friendRequests,
+                                        onBack = { viewModel.navigateTo(ScreenState.CHATS) },
+                                        onScanContacts = { viewModel.syncDeviceContacts(context, silent = false) },
+                                        onSendFriendRequest = { targetUser -> viewModel.sendFriendRequest(targetUser) },
+                                        onRespondToFriendRequest = { req, accept -> viewModel.respondToFriendRequest(req, accept) },
+                                        onCancelOrRemoveFriend = { targetUser -> viewModel.cancelOrRemoveFriend(targetUser) },
+                                        onDirectMessageUser = { targetUser -> viewModel.openDirectChatWithUser(targetUser) }
+                                    )
+                                }
                             }
 
                             // Modals
                             if (showUserSearchDialog) {
+                                val acceptedFriendIds = (savedContacts
+                                    .filter { it.relationship == "friend" }
+                                    .map { it.contactUserId } +
+                                    friendRequests
+                                        .filter { it.status == "accepted" }
+                                        .map { if (it.fromUserId == uid) it.toUserId else it.fromUserId })
+                                    .toSet()
+                                val pendingFriendIds = friendRequests
+                                    .filter { it.status == "pending" && (it.fromUserId == uid || it.toUserId == uid) }
+                                    .map { if (it.fromUserId == uid) it.toUserId else it.fromUserId }
+                                    .toSet()
                                 UserSearchDialog(
                                     users = directoryUsers,
                                     currentUserId = uid,
@@ -518,6 +580,11 @@ class MainActivity : ComponentActivity() {
                                     onSelectUser = { targetUser ->
                                         viewModel.closeUserSearchDialog()
                                         viewModel.openDirectChatWithUser(targetUser)
+                                    },
+                                    friendIds = acceptedFriendIds,
+                                    pendingFriendIds = pendingFriendIds,
+                                    onAddFriend = { targetUser ->
+                                        viewModel.sendFriendRequest(targetUser)
                                     }
                                 )
                             }
@@ -547,6 +614,9 @@ class MainActivity : ComponentActivity() {
                                             allowReactions = allowReactions,
                                             inviteCode = channel.inviteCode
                                         )
+                                    },
+                                    onUpdateChannelIcon = { iconUrl ->
+                                        viewModel.updateChannelIcon(channel.id, iconUrl)
                                     },
                                     onToggleChannelAdmin = { targetUserId, makeAdmin ->
                                         viewModel.setChannelAdminRole(channel.id, targetUserId, makeAdmin)
@@ -579,8 +649,14 @@ class MainActivity : ComponentActivity() {
                                     onCreateGroup = { groupName, memberIds, description ->
                                         viewModel.createGroupChat(groupName, memberIds, description)
                                     },
+                                    onCreateGroupWithIcon = { groupName, memberIds, description, iconUrl ->
+                                        viewModel.createGroupChat(groupName, memberIds, description, iconUrl)
+                                    },
                                     onOpenJoinInvite = {
                                         viewModel.openJoinInviteDialog()
+                                    },
+                                    onOpenFindFriends = {
+                                        viewModel.openFindFriends()
                                     }
                                 )
                             }

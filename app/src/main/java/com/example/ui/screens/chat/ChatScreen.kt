@@ -212,6 +212,7 @@ fun ChatScreen(
     onReactToMessage: (messageId: String, emoji: String) -> Unit = { _, _ -> },
     onShareGroupInvite: (() -> Unit)? = null,
     onToggleGroupAdmin: ((targetUserId: String, makeAdmin: Boolean) -> Unit)? = null,
+    onUpdateGroupIcon: ((String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -425,7 +426,8 @@ fun ChatScreen(
             onClearChat = onClearChat,
             onDeleteChat = onDeleteChat,
             onShareGroupInvite = onShareGroupInvite,
-            onToggleGroupAdmin = onToggleGroupAdmin
+            onToggleGroupAdmin = onToggleGroupAdmin,
+            onUpdateGroupIcon = onUpdateGroupIcon
         )
         return
     }
@@ -530,7 +532,7 @@ fun ChatScreen(
                         ) {
                             UserAvatar(
                                 name = title,
-                                avatarUrl = otherUser?.avatarUrl,
+                                avatarUrl = if (isGroup) chat.iconUrl else otherUser?.avatarUrl,
                                 isOnline = isOnline,
                                 availabilityStatus = if (isGroup) null else otherAvailability,
                                 isGroup = isGroup,

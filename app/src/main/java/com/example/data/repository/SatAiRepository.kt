@@ -214,7 +214,23 @@ open class SatAiRepository {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "SAT Limited AI inference failed", e)
-            Result.failure(e)
+            val rawMessage = e.localizedMessage.orEmpty()
+            val userFriendlyError = when {
+                rawMessage.contains("App Check", ignoreCase = true) ||
+                    rawMessage.contains("403") -> {
+                    IllegalStateException(
+                        "App Check verification failed ($rawMessage). Make sure Google Play Services is enabled and retry."
+                    )
+                }
+                rawMessage.contains("Unable to resolve host", ignoreCase = true) ||
+                    rawMessage.contains("network", ignoreCase = true) -> {
+                    IllegalStateException(
+                        "Network unavailable. Check your internet connection and try again."
+                    )
+                }
+                else -> e
+            }
+            Result.failure(userFriendlyError)
         }
     }
 

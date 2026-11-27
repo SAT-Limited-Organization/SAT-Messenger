@@ -1,8 +1,11 @@
 package com.example.ui.viewmodel
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.AvailabilityStatus
@@ -12,6 +15,7 @@ import com.example.data.model.ChannelPost
 import com.example.data.model.Chat
 import com.example.data.model.Community
 import com.example.data.model.ContactEntry
+import com.example.data.model.FriendRequest
 import com.example.data.model.InviteLink
 import com.example.data.model.Message
 import com.example.data.model.PrivacySettings
@@ -23,6 +27,9 @@ import com.example.data.repository.AppUpdateUiState
 import com.example.data.repository.AuthRepository
 import com.example.data.repository.AuthUiState
 import com.example.data.repository.ChatRepository
+import com.example.data.repository.DeviceContactInfo
+import com.example.data.repository.DeviceContactMatch
+import com.example.data.repository.DeviceContactsRepository
 import com.example.data.repository.InviteRepository
 import com.example.data.repository.SatAiMessage
 import com.example.data.repository.SatAiMode
@@ -30,16 +37,18 @@ import com.example.data.repository.SatAiRepository
 import com.example.data.repository.SatAiUiState
 import com.example.data.repository.SocialFeaturesRepository
 import com.example.data.repository.UserRepository
+import com.example.data.service.ContactDiscoveryService
+import com.example.data.service.FindFriendsDirectoryState
 import com.example.notifications.AppNotificationManager
+import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -49,7 +58,8 @@ enum class ScreenState {
     CONVERSATION,
     PROFILE,
     MANUAL,
-    SAT_AI
+    SAT_AI,
+    FIND_FRIENDS
 }
 
 class MessengerViewModel(
@@ -61,10 +71,13 @@ class MessengerViewModel(
     private val inviteRepository: InviteRepository = InviteRepository(context),
     private val appNotificationManager: AppNotificationManager = AppNotificationManager(context),
     private val satAiRepository: SatAiRepository = SatAiRepository(),
-    private val appUpdateRepository: AppUpdateRepository = AppUpdateRepository()
+    private val appUpdateRepository: AppUpdateRepository = AppUpdateRepository(),
+    private val deviceContactsRepository: DeviceContactsRepository = DeviceContactsRepository(),
+    private val contactDiscoveryService: ContactDiscoveryService = ContactDiscoveryService()
 ) : ViewModel() {
 
-    private val notificationPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val notificationPrefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     val authState: StateFlow<AuthUiState> = authRepository.authState
 
@@ -88,6 +101,30 @@ class MessengerViewModel(
 
     private val _savedContacts = MutableStateFlow<List<ContactEntry>>(emptyList())
     val savedContacts: StateFlow<List<ContactEntry>> = _savedContacts.asStateFlow()
+
+    private val _friendRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
+    val friendRequests: StateFlow<List<FriendRequest>> = _friendRequests.asStateFlow()
+
+    private val _deviceContactMatches = MutableStateFlow<Map<String, DeviceContactMatch>>(emptyMap())
+    val deviceContactMatches: StateFlow<Map<String, DeviceContactMatch>> = _deviceContactMatches.asStateFlow()
+
+    private val _isSyncingDeviceContacts = MutableStateFlow(false)
+    val isSyncingDeviceContacts: StateFlow<Boolean> = _isSyncingDeviceContacts.asStateFlow()
+
+    private val _hasDeviceContactsPermission = MutableStateFlow(
+        ContextCompat.checkSelfPermission(appContext, Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+    )
+    val hasDeviceContactsPermission: StateFlow<Boolean> = _hasDeviceContactsPermission.asStateFlow()
+
+    private val _deviceContactsScannedCount = MutableStateFlow(0)
+    val deviceContactsScannedCount: StateFlow<Int> = _deviceContactsScannedCount.asStateFlow()
+
+    val findFriendsDirectoryState: StateFlow<FindFriendsDirectoryState> =
+        contactDiscoveryService.directoryState
+
+    private val _secondaryUsernameFeedback = MutableStateFlow<Pair<Boolean, String>?>(null)
+    val secondaryUsernameFeedback: StateFlow<Pair<Boolean, String>?> = _secondaryUsernameFeedback.asStateFlow()
 
     private val _statuses = MutableStateFlow<List<StatusItem>>(emptyList())
     val statuses: StateFlow<List<StatusItem>> = _statuses.asStateFlow()
@@ -201,6 +238,7 @@ class MessengerViewModel(
     private var activeChatJob: Job? = null
     private var satAiJob: Job? = null
     private var updateCheckJob: Job? = null
+    private var friendRequestsJob: Job? = null
     private val chatMessageListeners = mutableMapOf<String, Job>()
 
     init {
@@ -355,7 +393,15 @@ class MessengerViewModel(
         // Observe colleague & friend directory
         viewModelScope.launch {
             userRepository.searchUsers("").collectLatest { users ->
-                _directoryUsers.value = users.filter { it.userId != uid }
+                val filtered = users.filter { it.userId != uid }
+                _directoryUsers.value = filtered
+                val recorrelated = contactDiscoveryService.recorrelateWithRegisteredUsers(
+                    registeredUsers = filtered,
+                    currentUserId = uid
+                )
+                if (recorrelated.isNotEmpty() || _deviceContactMatches.value.isNotEmpty()) {
+                    _deviceContactMatches.value = recorrelated.associate { it.user.userId to it.toDeviceContactMatch() }
+                }
             }
         }
 
@@ -364,6 +410,24 @@ class MessengerViewModel(
             userRepository.observeSavedContacts(uid).collectLatest { contacts ->
                 _savedContacts.value = contacts
             }
+        }
+
+        // Observe friend requests (incoming, outgoing, accepted)
+        friendRequestsJob?.cancel()
+        friendRequestsJob = viewModelScope.launch {
+            userRepository.observeFriendRequests(uid).collectLatest { requests ->
+                _friendRequests.value = requests
+            }
+        }
+
+        // Auto-sync device contacts quietly if permission is already granted
+        val contactsPermGranted = contactDiscoveryService.hasReadContactsPermission(appContext)
+        _hasDeviceContactsPermission.value = contactsPermGranted
+        if (contactsPermGranted) {
+            contactDiscoveryService.startObservingContacts(appContext) {
+                syncDeviceContacts(appContext, silent = true)
+            }
+            syncDeviceContacts(appContext, silent = true)
         }
 
         // Observe privacy settings
@@ -420,9 +484,12 @@ class MessengerViewModel(
         profileJob?.cancel()
         activeChatJob?.cancel()
         satAiJob?.cancel()
+        friendRequestsJob?.cancel()
         chatMessageListeners.values.forEach { it.cancel() }
         chatMessageListeners.clear()
         notifiedMessageIds.clear()
+        contactDiscoveryService.stopObservingContacts()
+        contactDiscoveryService.clear()
         appNotificationManager.cancelAll()
         _unreadCounts.value = emptyMap()
         _totalUnreadCount.value = 0
@@ -431,6 +498,11 @@ class MessengerViewModel(
         _messages.value = emptyList()
         _directoryUsers.value = emptyList()
         _savedContacts.value = emptyList()
+        _friendRequests.value = emptyList()
+        _deviceContactMatches.value = emptyMap()
+        _deviceContactsScannedCount.value = 0
+        _isSyncingDeviceContacts.value = false
+        _secondaryUsernameFeedback.value = null
         _userProfile.value = null
         _activeChat.value = null
         _activeChannel.value = null
@@ -549,7 +621,12 @@ class MessengerViewModel(
         }
     }
 
-    fun createGroupChat(name: String, selectedMemberIds: List<String>, description: String? = null) {
+    fun createGroupChat(
+        name: String,
+        selectedMemberIds: List<String>,
+        description: String? = null,
+        iconUrl: String? = null
+    ) {
         val current = _userProfile.value ?: return
         if (name.isBlank()) {
             _toastMessage.value = "Group room name cannot be empty"
@@ -560,19 +637,39 @@ class MessengerViewModel(
                 name = name,
                 description = description,
                 selectedMemberIds = selectedMemberIds,
-                currentUserName = current.displayName
+                currentUserName = current.displayName,
+                iconUrl = iconUrl
             )
             result.onSuccess { roomId ->
                 val chat = Chat(
                     id = roomId,
                     type = "group",
                     name = name,
-                    memberIds = selectedMemberIds + current.userId
+                    description = description,
+                    iconUrl = iconUrl,
+                    memberIds = (selectedMemberIds + current.userId).distinct(),
+                    adminIds = listOf(current.userId),
+                    createdBy = current.userId
                 )
                 openChat(chat)
                 closeNewChatDialog()
             }.onFailure {
                 _toastMessage.value = "Failed to create group room: ${it.localizedMessage}"
+            }
+        }
+    }
+
+    fun updateGroupIcon(chatId: String, iconUrl: String?) {
+        val cleanIcon = iconUrl?.trim()?.takeIf { it.isNotBlank() }
+        viewModelScope.launch {
+            val result = chatRepository.updateGroupIcon(chatId, cleanIcon)
+            result.onSuccess {
+                if (_activeChat.value?.id == chatId) {
+                    _activeChat.update { it?.copy(iconUrl = cleanIcon) }
+                }
+                _toastMessage.value = if (cleanIcon != null) "Group icon updated." else "Group icon removed."
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update group icon."
             }
         }
     }
@@ -801,6 +898,91 @@ class MessengerViewModel(
         }
     }
 
+    fun updateProfileAvatar(avatarUrl: String?) {
+        val cleanAvatar = avatarUrl?.trim()?.takeIf { it.isNotBlank() }
+        viewModelScope.launch {
+            val result = userRepository.updateProfileAvatar(cleanAvatar)
+            result.onSuccess {
+                _userProfile.update { it?.copy(avatarUrl = cleanAvatar) }
+                _toastMessage.value = if (cleanAvatar != null) "Profile photo updated." else "Profile photo removed."
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update profile photo."
+            }
+        }
+    }
+
+    fun updateSecondaryUsername(rawUsername: String) {
+        _secondaryUsernameFeedback.value = null
+        viewModelScope.launch {
+            val result = userRepository.updateSecondaryUsername(rawUsername)
+            result.onSuccess { eval ->
+                val remainingNote = if (eval.nextLastChangedAtMs == null) {
+                    "Secondary username @${eval.normalizedUsername} claimed! You can change it up to 3 times on an active change day (10-day cooldown between change windows)."
+                } else {
+                    "Secondary username updated to @${eval.normalizedUsername}. ${eval.remainingChangesTodayAfterSave} change(s) remaining today."
+                }
+                _secondaryUsernameFeedback.value = true to remainingNote
+                _toastMessage.value = "Username updated to @${eval.normalizedUsername}."
+            }.onFailure { err ->
+                val message = err.localizedMessage?.takeIf { it.isNotBlank() }
+                    ?: "Could not update secondary username."
+                _secondaryUsernameFeedback.value = false to message
+                _toastMessage.value = message
+            }
+        }
+    }
+
+    fun clearSecondaryUsernameFeedback() {
+        _secondaryUsernameFeedback.value = null
+    }
+
+    fun openFindFriends() {
+        _currentScreen.value = ScreenState.FIND_FRIENDS
+        if (contactDiscoveryService.hasReadContactsPermission(appContext)) {
+            syncDeviceContacts(appContext, silent = true)
+        }
+    }
+
+    fun syncDeviceContacts(context: Context = appContext, silent: Boolean = false) {
+        val granted = contactDiscoveryService.hasReadContactsPermission(context)
+        _hasDeviceContactsPermission.value = granted
+        if (!granted) {
+            if (!silent) {
+                _toastMessage.value = "Contacts permission is needed to find registered device contacts."
+            }
+            return
+        }
+
+        contactDiscoveryService.startObservingContacts(appContext) {
+            syncDeviceContacts(appContext, silent = true)
+        }
+
+        viewModelScope.launch {
+            _isSyncingDeviceContacts.value = true
+            try {
+                val uid = _userProfile.value?.userId ?: Firebase.auth.currentUser?.uid.orEmpty()
+                val directoryState = contactDiscoveryService.scanAndPopulateDirectory(
+                    context = context,
+                    directoryUsers = _directoryUsers.value,
+                    currentUserId = uid,
+                    fetchUsersFallback = { userRepository.fetchAllDirectoryUsers() }
+                )
+                val matches = directoryState.entries.associate { it.user.userId to it.toDeviceContactMatch() }
+                _deviceContactsScannedCount.value = directoryState.scannedContactCount
+                _deviceContactMatches.value = matches
+                if (!silent) {
+                    _toastMessage.value = when {
+                        !directoryState.errorMessage.isNullOrBlank() -> directoryState.errorMessage
+                        matches.isNotEmpty() -> "Find Friends ready: ${matches.size} registered SAT Messenger user(s) matched."
+                        else -> "Scanned ${directoryState.scannedContactCount} device contacts; no registered users matched yet."
+                    }
+                }
+            } finally {
+                _isSyncingDeviceContacts.value = false
+            }
+        }
+    }
+
     fun updateAvailabilityStatus(status: AvailabilityStatus) {
         viewModelScope.launch {
             val result = userRepository.updateAvailabilityStatus(status)
@@ -812,40 +994,110 @@ class MessengerViewModel(
         }
     }
 
-    fun toggleFriendContact(targetUser: UserProfile) {
-        val isAlreadyFriend = _savedContacts.value.any {
-            it.contactUserId == targetUser.userId && it.relationship == "friend"
-        }
+    fun sendFriendRequest(targetUser: UserProfile) {
+        val authUser = Firebase.auth.currentUser
+        val current = _userProfile.value ?: authUser?.let {
+            UserProfile(
+                userId = it.uid,
+                displayName = it.displayName?.takeIf { n -> n.isNotBlank() }
+                    ?: it.email?.substringBefore("@") ?: "SAT Member",
+                email = it.email.orEmpty(),
+                avatarUrl = it.photoUrl?.toString()
+            )
+        } ?: return
+
         viewModelScope.launch {
-            val result = if (isAlreadyFriend) {
-                userRepository.removeSavedContact(targetUser.userId)
-            } else {
-                userRepository.setContactRelationship(
-                    targetUserId = targetUser.userId,
-                    relationship = "friend"
-                )
-            }
-            result.onSuccess {
-                _toastMessage.value = if (isAlreadyFriend) {
-                    "Removed ${targetUser.username} from Friends."
-                } else {
-                    "Added ${targetUser.username} to Friends."
+            val result = userRepository.sendFriendRequest(targetUser, current)
+            result.onSuccess { outcome ->
+                _toastMessage.value = when (outcome) {
+                    "already_friends" -> "You are already friends with ${targetUser.username}."
+                    "accepted" -> "Accepted ${targetUser.username}'s friend request!"
+                    else -> "Friend request sent to ${targetUser.username}."
                 }
             }.onFailure { err ->
-                _toastMessage.value = "Failed to update contact: ${err.localizedMessage}"
+                _toastMessage.value = "Could not send friend request: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun respondToFriendRequest(request: FriendRequest, accept: Boolean) {
+        viewModelScope.launch {
+            val result = userRepository.respondToFriendRequest(request, accept)
+            result.onSuccess {
+                _toastMessage.value = if (accept) {
+                    "You and ${request.fromUserName.ifBlank { "user" }} are now friends!"
+                } else {
+                    "Friend request declined."
+                }
+            }.onFailure { err ->
+                _toastMessage.value = "Failed to respond to request: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun cancelOrRemoveFriend(targetUser: UserProfile) {
+        viewModelScope.launch {
+            val result = userRepository.cancelOrRemoveFriend(targetUser.userId)
+            result.onSuccess {
+                _toastMessage.value = "Removed ${targetUser.username} from Friends."
+            }.onFailure { err ->
+                _toastMessage.value = "Failed to update friend status: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun toggleFriendContact(targetUser: UserProfile) {
+        val uid = _userProfile.value?.userId ?: Firebase.auth.currentUser?.uid.orEmpty()
+        val existingRequest = _friendRequests.value.firstOrNull { req ->
+            (req.fromUserId == targetUser.userId && req.toUserId == uid) ||
+                (req.fromUserId == uid && req.toUserId == targetUser.userId)
+        }
+        val isSavedFriend = _savedContacts.value.any {
+            it.contactUserId == targetUser.userId && it.relationship == "friend"
+        }
+
+        when {
+            existingRequest?.status == "pending" && existingRequest.toUserId == uid -> {
+                respondToFriendRequest(existingRequest, accept = true)
+            }
+            existingRequest?.status == "accepted" || isSavedFriend || existingRequest?.status == "pending" -> {
+                cancelOrRemoveFriend(targetUser)
+            }
+            else -> {
+                sendFriendRequest(targetUser)
             }
         }
     }
 
     // Status Actions
     fun postStatus(text: String?, mediaUrl: String?, backgroundColor: String?) {
-        val current = _userProfile.value ?: return
+        val trimmedText = text?.trim()?.takeIf { it.isNotBlank() }
+        val trimmedMedia = mediaUrl?.trim()?.takeIf { it.isNotBlank() }
+        if (trimmedText == null && trimmedMedia == null) {
+            _toastMessage.value = "Add text or pick a photo/video before sharing a status."
+            return
+        }
+
+        val authUser = Firebase.auth.currentUser
+        val current = _userProfile.value
+        if (authUser == null && current == null) {
+            _toastMessage.value = "Please sign in before posting a status."
+            return
+        }
+
+        val resolvedName = current?.displayName?.takeIf { it.isNotBlank() }
+            ?: current?.resolvedPrimaryUsername?.takeIf { it.isNotBlank() }
+            ?: authUser?.displayName?.takeIf { it.isNotBlank() }
+            ?: authUser?.email?.substringBefore("@")?.takeIf { it.isNotBlank() }
+            ?: "SAT Member"
+        val resolvedAvatar = current?.avatarUrl ?: authUser?.photoUrl?.toString()
+
         viewModelScope.launch {
             val result = socialRepository.postStatus(
-                userName = current.displayName,
-                userAvatarUrl = current.avatarUrl,
-                text = text,
-                mediaUrl = mediaUrl,
+                userName = resolvedName,
+                userAvatarUrl = resolvedAvatar,
+                text = trimmedText,
+                mediaUrl = trimmedMedia,
                 backgroundColor = backgroundColor
             )
             if (result.isSuccess) {
@@ -861,6 +1113,8 @@ class MessengerViewModel(
             val result = socialRepository.deleteStatus(statusId)
             if (result.isSuccess) {
                 _toastMessage.value = "Status removed."
+            } else {
+                _toastMessage.value = "Failed to delete status: ${result.exceptionOrNull()?.localizedMessage}"
             }
         }
     }
@@ -871,11 +1125,55 @@ class MessengerViewModel(
         }
     }
 
-    fun replyToStatus(authorId: String, text: String) {
-        val author = _directoryUsers.value.firstOrNull { it.userId == authorId } ?: return
-        openDirectChatWithUser(author)
-        sendMessage(text = "Replying to status: $text")
-        _toastMessage.value = "Status reply sent."
+    fun replyToStatus(authorId: String, text: String, authorName: String = "") {
+        val replyBody = text.trim()
+        if (replyBody.isBlank()) return
+
+        val authUser = Firebase.auth.currentUser
+        val current = _userProfile.value
+        val currentUid = current?.userId?.takeIf { it.isNotBlank() } ?: authUser?.uid ?: return
+        val currentName = current?.displayName?.takeIf { it.isNotBlank() }
+            ?: current?.resolvedPrimaryUsername?.takeIf { it.isNotBlank() }
+            ?: authUser?.displayName?.takeIf { it.isNotBlank() }
+            ?: authUser?.email?.substringBefore("@")?.takeIf { it.isNotBlank() }
+            ?: "SAT Member"
+
+        viewModelScope.launch {
+            val author = _directoryUsers.value.firstOrNull { it.userId == authorId }
+                ?: userRepository.getUserProfile(authorId)
+                ?: UserProfile(userId = authorId, displayName = authorName.ifBlank { "SAT Member" })
+            val targetName = author.displayName.takeIf { it.isNotBlank() }
+                ?: author.email.substringBefore("@").takeIf { it.isNotBlank() }
+                ?: authorName.ifBlank { "User" }
+
+            val chatResult = chatRepository.getOrCreateDirectChat(
+                targetUserId = author.userId,
+                targetUserName = targetName,
+                currentUserName = currentName
+            )
+            chatResult.onSuccess { chatId ->
+                val chat = Chat(
+                    id = chatId,
+                    type = "direct",
+                    memberIds = listOf(currentUid, author.userId),
+                    name = targetName,
+                    participantNames = mapOf(currentUid to currentName, author.userId to targetName)
+                )
+                openChat(chat)
+                val sendResult = chatRepository.sendMessage(
+                    chatId = chatId,
+                    senderName = currentName,
+                    text = "Replying to status: $replyBody"
+                )
+                sendResult.onSuccess {
+                    _toastMessage.value = "Status reply sent to $targetName."
+                }.onFailure { err ->
+                    _toastMessage.value = "Opened chat, but reply failed: ${err.localizedMessage}"
+                }
+            }.onFailure { err ->
+                _toastMessage.value = "Failed to send status reply: ${err.localizedMessage}"
+            }
+        }
     }
 
     // Channel Actions
@@ -931,6 +1229,21 @@ class MessengerViewModel(
                 _toastMessage.value = "Channel settings updated."
             }.onFailure {
                 _toastMessage.value = "Failed to update channel: ${it.localizedMessage}"
+            }
+        }
+    }
+
+    fun updateChannelIcon(channelId: String, iconUrl: String?) {
+        val cleanIcon = iconUrl?.trim()?.takeIf { it.isNotBlank() }
+        viewModelScope.launch {
+            val result = socialRepository.updateChannelIcon(channelId, cleanIcon)
+            result.onSuccess {
+                if (_activeChannel.value?.id == channelId) {
+                    _activeChannel.update { it?.copy(iconUrl = cleanIcon) }
+                }
+                _toastMessage.value = if (cleanIcon != null) "Channel icon updated." else "Channel icon removed."
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update channel icon."
             }
         }
     }
@@ -1145,7 +1458,12 @@ class MessengerViewModel(
     }
 
     // Community Actions
-    fun createCommunity(name: String, description: String?, subgroups: List<String>) {
+    fun createCommunity(
+        name: String,
+        description: String?,
+        subgroups: List<String>,
+        iconUrl: String? = null
+    ) {
         val current = _userProfile.value ?: return
         viewModelScope.launch {
             // First create the subrooms
@@ -1160,11 +1478,23 @@ class MessengerViewModel(
                 roomResult.onSuccess { id -> createdSubroomIds.add(id) }
             }
 
-            val result = socialRepository.createCommunity(name, description, null, createdSubroomIds)
+            val result = socialRepository.createCommunity(name, description, iconUrl, createdSubroomIds)
             if (result.isSuccess) {
                 _toastMessage.value = "Community '$name' created with ${createdSubroomIds.size} subgroups."
             } else {
                 _toastMessage.value = "Failed to create community: ${result.exceptionOrNull()?.localizedMessage}"
+            }
+        }
+    }
+
+    fun updateCommunityIcon(communityId: String, iconUrl: String?) {
+        val cleanIcon = iconUrl?.trim()?.takeIf { it.isNotBlank() }
+        viewModelScope.launch {
+            val result = socialRepository.updateCommunityIcon(communityId, cleanIcon)
+            result.onSuccess {
+                _toastMessage.value = if (cleanIcon != null) "Community icon updated." else "Community icon removed."
+            }.onFailure { err ->
+                _toastMessage.value = err.localizedMessage ?: "Failed to update community icon."
             }
         }
     }
@@ -1383,6 +1713,11 @@ class MessengerViewModel(
 
     fun clearToast() {
         _toastMessage.value = null
+    }
+
+    override fun onCleared() {
+        contactDiscoveryService.stopObservingContacts()
+        super.onCleared()
     }
 
     private companion object {

@@ -1,5 +1,10 @@
 package com.example.ui.screens.dialogs
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,13 +14,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Contacts
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -35,16 +45,25 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.UserProfile
 import com.example.ui.components.UserAvatar
+import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatTeal
+import com.example.util.MediaAttachmentHelper
+import com.example.util.UserSearchMatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun NewChatDialog(
@@ -52,32 +71,53 @@ fun NewChatDialog(
     onDismiss: () -> Unit,
     onSelectUser: (UserProfile) -> Unit,
     onCreateGroup: (String, List<String>, String?) -> Unit,
-    onOpenJoinInvite: (() -> Unit)? = null
+    onCreateGroupWithIcon: ((String, List<String>, String?, String?) -> Unit)? = null,
+    onOpenJoinInvite: (() -> Unit)? = null,
+    onOpenFindFriends: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var groupName by remember { mutableStateOf("") }
     var groupDescription by remember { mutableStateOf("") }
+    var groupIconUrl by remember { mutableStateOf<String?>(null) }
     val selectedGroupMembers = remember { mutableStateListOf<String>() }
+
+    val groupIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                if (encoded != null) {
+                    groupIconUrl = encoded
+                } else {
+                    Toast.makeText(context, "Could not process selected icon.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     val filteredUsers = remember(users, searchQuery) {
         val query = searchQuery.trim()
         if (query.isBlank()) users
-        else users.filter {
-            it.displayName.contains(query, ignoreCase = true) ||
-                    it.email.contains(query, ignoreCase = true) ||
-                    (it.phoneNumber != null && it.phoneNumber.contains(query, ignoreCase = true)) ||
-                    (it.statusMessage?.contains(query, ignoreCase = true) == true)
-        }
+        else users.filter { UserSearchMatcher.matches(it, query) }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 520.dp)
                 .padding(vertical = 16.dp)
         ) {
             Column(
@@ -117,6 +157,40 @@ fun NewChatDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (selectedTab == 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        UserAvatar(
+                            name = groupName.ifBlank { "Group" },
+                            avatarUrl = groupIconUrl,
+                            isGroup = true,
+                            size = 52.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                groupIconPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("create_group_pick_icon_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (groupIconUrl != null) "Change Group Icon" else "Pick Group Icon")
+                        }
+                        if (groupIconUrl != null) {
+                            IconButton(
+                                onClick = { groupIconUrl = null },
+                                modifier = Modifier.testTag("create_group_remove_icon_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.DeleteOutline, contentDescription = "Remove group icon", tint = SatErrorRed)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = groupName,
                         onValueChange = { groupName = it },
@@ -146,7 +220,7 @@ fun NewChatDialog(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search SAT colleagues...") },
+                    placeholder = { Text("Name, @username, email or phone...") },
                     leadingIcon = {
                         Icon(imageVector = Icons.Default.Search, contentDescription = null)
                     },
@@ -192,10 +266,11 @@ fun NewChatDialog(
                                     .padding(vertical = 10.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val userName = user.displayName.takeIf { it.isNotBlank() }
-                                    ?: user.email.substringBefore("@").takeIf { it.isNotBlank() }
-                                    ?: "User"
-                                val usernameHandle = user.email.substringBefore("@").takeIf { it.isNotBlank() }?.let { "@$it" }
+                                val userName = user.username
+                                val handleSummary = listOfNotNull(
+                                    user.primaryUsernameHandle,
+                                    user.secondaryUsernameHandle
+                                ).joinToString(" • ")
 
                                 UserAvatar(
                                     name = userName,
@@ -205,22 +280,20 @@ fun NewChatDialog(
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = userName,
-                                            fontWeight = FontWeight.SemiBold,
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        if (usernameHandle != null && usernameHandle != "@$userName") {
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = usernameHandle,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = SatTeal
-                                            )
-                                        }
-                                    }
-                                    val subtitle = listOfNotNull(user.phoneNumber, user.statusMessage ?: user.email).joinToString(" • ")
+                                    Text(
+                                        text = userName,
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Text(
+                                        text = handleSummary,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SatTeal
+                                    )
+                                    val subtitle = listOfNotNull(
+                                        user.phoneNumber,
+                                        user.email.takeIf { it.isNotBlank() } ?: user.statusMessage
+                                    ).joinToString(" • ")
                                     Text(
                                         text = subtitle,
                                         style = MaterialTheme.typography.bodySmall,
@@ -249,11 +322,20 @@ fun NewChatDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
-                            onCreateGroup(
-                                groupName,
-                                selectedGroupMembers.toList(),
-                                groupDescription.ifBlank { null }
-                            )
+                            if (onCreateGroupWithIcon != null) {
+                                onCreateGroupWithIcon(
+                                    groupName,
+                                    selectedGroupMembers.toList(),
+                                    groupDescription.ifBlank { null },
+                                    groupIconUrl
+                                )
+                            } else {
+                                onCreateGroup(
+                                    groupName,
+                                    selectedGroupMembers.toList(),
+                                    groupDescription.ifBlank { null }
+                                )
+                            }
                         },
                         enabled = groupName.isNotBlank() && selectedGroupMembers.isNotEmpty(),
                         shape = RoundedCornerShape(12.dp),
@@ -262,6 +344,24 @@ fun NewChatDialog(
                             .testTag("create_group_button")
                     ) {
                         Text("Create Group (${selectedGroupMembers.size} selected)")
+                    }
+                }
+
+                if (onOpenFindFriends != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onOpenFindFriends()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("new_chat_find_friends_button")
+                    ) {
+                        Icon(imageVector = Icons.Default.Contacts, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Find Friends from Device Contacts")
                     }
                 }
 

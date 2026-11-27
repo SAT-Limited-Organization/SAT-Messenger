@@ -9,13 +9,16 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
+import com.example.BuildConfig
 import com.example.data.model.Channel
 import com.example.data.model.Chat
 import com.example.data.model.Community
 import com.example.data.model.Message
+import com.example.data.model.PrivacySettings
 import com.example.data.model.UserProfile
 import com.example.data.repository.GroundingSource
 import com.example.data.repository.SatAiMessage
@@ -25,6 +28,7 @@ import com.example.ui.screens.ai.SatLimitedAiScreen
 import com.example.ui.screens.channels.ChannelFeedDialog
 import com.example.ui.screens.chat.ChatDetailsScreen
 import com.example.ui.screens.communities.CommunitiesScreen
+import com.example.ui.screens.profile.ProfileScreen
 import com.example.ui.screens.status.StatusScreen
 import com.example.ui.theme.SATMessengerTheme
 import com.google.firebase.FirebaseApp
@@ -289,5 +293,198 @@ class FeaturesUiAndAiTest {
         assertFalse(requested.contains("android.permission.WRITE_EXTERNAL_STORAGE"))
         assertFalse(requested.contains("android.permission.READ_MEDIA_IMAGES"))
         assertFalse(requested.contains("android.permission.READ_MEDIA_VIDEO"))
+    }
+
+    @Test
+    fun profileScreen_displaysPhotoControlsAndRemovesAvatar() {
+        var updatedAvatar: String? = "initial"
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                ProfileScreen(
+                    userProfile = UserProfile(
+                        userId = "u1",
+                        displayName = "Alice Creator",
+                        email = "alice@satlimited.com",
+                        avatarUrl = "data:image/jpeg;base64,AAAA"
+                    ),
+                    privacySettings = PrivacySettings(userId = "u1"),
+                    blockedUsers = emptyList(),
+                    onBack = {},
+                    onUpdateProfile = { _, _, _ -> },
+                    onUpdateAvatar = { updatedAvatar = it },
+                    onUpdatePrivacy = { _, _ -> },
+                    onUnblockUser = {},
+                    onSignOut = {},
+                    onDeleteAccount = {}
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("profile_change_photo_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("profile_remove_photo_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        assertEquals(null, updatedAvatar)
+
+        composeRule.onNodeWithTag("profile_app_version_text").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "SAT Messenger v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+        ).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun chatDetailsScreen_groupAdminCanRemoveIcon_nonAdminCannotEdit() {
+        var updatedGroupIcon: String? = "initial"
+        val chat = Chat(
+            id = "room_icon_1",
+            type = "group",
+            name = "Ops Group",
+            iconUrl = "data:image/jpeg;base64,AAAA",
+            memberIds = listOf("alice", "bob"),
+            adminIds = listOf("alice"),
+            createdBy = "alice"
+        )
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                ChatDetailsScreen(
+                    chat = chat,
+                    currentUserId = "alice",
+                    messages = emptyList(),
+                    directoryUsers = listOf(
+                        UserProfile(userId = "alice", displayName = "Alice Creator"),
+                        UserProfile(userId = "bob", displayName = "Bob Member")
+                    ),
+                    onBack = {},
+                    onDirectMessageUser = {},
+                    onBlockUser = { _, _ -> },
+                    onReportUser = { _, _ -> },
+                    onUpdateGroupIcon = { updatedGroupIcon = it }
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("group_change_icon_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("group_remove_icon_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        assertEquals(null, updatedGroupIcon)
+    }
+
+    @Test
+    fun chatDetailsScreen_nonAdminDoesNotSeeGroupIconControls() {
+        val chat = Chat(
+            id = "room_icon_2",
+            type = "group",
+            name = "Ops Group",
+            iconUrl = "data:image/jpeg;base64,AAAA",
+            memberIds = listOf("alice", "bob"),
+            adminIds = listOf("alice"),
+            createdBy = "alice"
+        )
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                ChatDetailsScreen(
+                    chat = chat,
+                    currentUserId = "bob",
+                    messages = emptyList(),
+                    directoryUsers = listOf(
+                        UserProfile(userId = "alice", displayName = "Alice Creator"),
+                        UserProfile(userId = "bob", displayName = "Bob Member")
+                    ),
+                    onBack = {},
+                    onDirectMessageUser = {},
+                    onBlockUser = { _, _ -> },
+                    onReportUser = { _, _ -> },
+                    onUpdateGroupIcon = {}
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("group_change_icon_button").assertDoesNotExist()
+        composeRule.onNodeWithTag("group_remove_icon_button").assertDoesNotExist()
+    }
+
+    @Test
+    fun channelFeedDialog_adminCanRemoveChannelIcon() {
+        var updatedIcon: String? = "initial"
+        val channel = Channel(
+            id = "chan_icon_1",
+            name = "Telemetry Broadcast",
+            iconUrl = "data:image/jpeg;base64,AAAA",
+            creatorId = "alice",
+            adminIds = listOf("alice"),
+            subscriberIds = listOf("alice"),
+            followerCount = 1
+        )
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                ChannelFeedDialog(
+                    channel = channel,
+                    currentUserId = "alice",
+                    posts = emptyList(),
+                    onDismiss = {},
+                    onPostMessage = { _, _ -> },
+                    onUpdateChannelIcon = { updatedIcon = it },
+                    onReact = { _, _, _ -> }
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("channel_feed_settings_button").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("channel_change_icon_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("channel_remove_icon_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(null, updatedIcon)
+    }
+
+    @Test
+    fun communitiesScreen_adminCanRemoveCommunityIcon() {
+        var updatedCommunityId: String? = null
+        var updatedIcon: String? = "initial"
+        val community = Community(
+            id = "comm_icon_1",
+            name = "SAT Engineering",
+            iconUrl = "data:image/jpeg;base64,AAAA",
+            creatorId = "alice",
+            adminIds = listOf("alice"),
+            memberIds = listOf("alice")
+        )
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                CommunitiesScreen(
+                    currentUserId = "alice",
+                    communities = listOf(community),
+                    allChats = emptyList(),
+                    onOpenChat = {},
+                    onCreateCommunity = { _, _, _ -> },
+                    onJoinCommunity = {},
+                    onUpdateCommunityIcon = { cid, icon ->
+                        updatedCommunityId = cid
+                        updatedIcon = icon
+                    }
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("community_edit_icon_comm_icon_1").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("community_change_icon_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("community_remove_icon_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("comm_icon_1", updatedCommunityId)
+        assertEquals(null, updatedIcon)
     }
 }

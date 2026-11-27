@@ -88,8 +88,10 @@ import com.example.data.model.Channel
 import com.example.data.model.Chat
 import com.example.data.model.Community
 import com.example.data.model.ContactEntry
+import com.example.data.model.FriendRequest
 import com.example.data.model.StatusItem
 import com.example.data.model.UserProfile
+import com.example.data.repository.DeviceContactMatch
 import com.example.ui.components.EmptyStateView
 import com.example.ui.components.UserAvatar
 import com.example.ui.screens.channels.ChannelsScreen
@@ -100,6 +102,7 @@ import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatTeal
+import com.example.util.UserSearchMatcher
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -139,8 +142,10 @@ fun ChatListScreen(
     onOpenChannel: (Channel) -> Unit,
     onShareChannelInvite: (Channel) -> Unit = {},
     onCreateCommunity: (name: String, desc: String?, subgroups: List<String>) -> Unit,
+    onCreateCommunityWithIcon: ((name: String, desc: String?, iconUrl: String?, subgroups: List<String>) -> Unit)? = null,
     onJoinCommunity: (String) -> Unit,
     onShareCommunityInvite: (Community) -> Unit = {},
+    onUpdateCommunityIcon: (communityId: String, iconUrl: String?) -> Unit = { _, _ -> },
     onOpenJoinInvite: () -> Unit = {},
     onOpenUserSearch: () -> Unit,
     onDirectMessageUser: (UserProfile) -> Unit,
@@ -148,6 +153,16 @@ fun ChatListScreen(
     onToggleFriendContact: (UserProfile) -> Unit = {},
     onOpenSatAi: () -> Unit = {},
     onToggleCommunityAdmin: (communityId: String, targetUserId: String, makeAdmin: Boolean) -> Unit = { _, _, _ -> },
+    friendRequests: List<FriendRequest> = emptyList(),
+    deviceContactMatches: Map<String, DeviceContactMatch> = emptyMap(),
+    isSyncingDeviceContacts: Boolean = false,
+    hasDeviceContactsPermission: Boolean = false,
+    deviceContactsScannedCount: Int = 0,
+    onSyncDeviceContacts: () -> Unit = {},
+    onOpenFindFriends: () -> Unit = {},
+    onSendFriendRequest: (UserProfile) -> Unit = onToggleFriendContact,
+    onRespondToFriendRequest: (FriendRequest, Boolean) -> Unit = { _, _ -> },
+    onCancelOrRemoveFriend: (UserProfile) -> Unit = onToggleFriendContact,
     showNotificationPermissionBanner: Boolean = false,
     onEnableNotificationsClick: () -> Unit = {},
     onDismissNotificationBanner: () -> Unit = {},
@@ -184,9 +199,8 @@ fun ChatListScreen(
                     otherUser?.displayName ?: "Direct Message"
                 }
                 title.contains(query, ignoreCase = true) ||
-                        (otherUser?.email?.contains(query, ignoreCase = true) == true) ||
-                        (otherUser?.phoneNumber != null && otherUser.phoneNumber.contains(query, ignoreCase = true)) ||
-                        (chat.lastMessageText?.contains(query, ignoreCase = true) == true)
+                    (otherUser != null && UserSearchMatcher.matches(otherUser, query)) ||
+                    (chat.lastMessageText?.contains(query, ignoreCase = true) == true)
             }
         }
     }
@@ -199,7 +213,7 @@ fun ChatListScreen(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search by name, email, phone...") },
+                            placeholder = { Text("Name, @username, email, phone...") },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -480,10 +494,12 @@ fun ChatListScreen(
                         directoryUsers = directoryUsers,
                         onOpenChat = onChatClick,
                         onCreateCommunity = onCreateCommunity,
+                        onCreateCommunityWithIcon = onCreateCommunityWithIcon,
                         onJoinCommunity = onJoinCommunity,
                         onShareCommunityInvite = onShareCommunityInvite,
                         onOpenJoinInvite = onOpenJoinInvite,
                         onToggleCommunityAdmin = onToggleCommunityAdmin,
+                        onUpdateCommunityIcon = onUpdateCommunityIcon,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -497,6 +513,16 @@ fun ChatListScreen(
                         onDirectMessageUser = onDirectMessageUser,
                         onUpdateAvailability = onUpdateAvailability,
                         onToggleFriend = onToggleFriendContact,
+                        friendRequests = friendRequests,
+                        deviceContactMatches = deviceContactMatches,
+                        isSyncingDeviceContacts = isSyncingDeviceContacts,
+                        hasDeviceContactsPermission = hasDeviceContactsPermission,
+                        deviceContactsScannedCount = deviceContactsScannedCount,
+                        onSyncDeviceContacts = onSyncDeviceContacts,
+                        onOpenFindFriends = onOpenFindFriends,
+                        onSendFriendRequest = onSendFriendRequest,
+                        onRespondToFriendRequest = onRespondToFriendRequest,
+                        onCancelOrRemoveFriend = onCancelOrRemoveFriend,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -769,7 +795,7 @@ private fun ChatsTabContent(
                         ) {
                             UserAvatar(
                                 name = title,
-                                avatarUrl = otherUser?.avatarUrl,
+                                avatarUrl = if (isGroup) chat.iconUrl else otherUser?.avatarUrl,
                                 isOnline = if (isGroup) false else isOtherOnline,
                                 availabilityStatus = if (isGroup) null else otherUser?.resolvedAvailability(),
                                 isGroup = isGroup,

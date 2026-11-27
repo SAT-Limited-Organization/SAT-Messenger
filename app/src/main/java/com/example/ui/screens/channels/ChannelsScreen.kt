@@ -5,11 +5,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +47,7 @@ import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -75,6 +78,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,6 +104,10 @@ import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatTeal
+import com.example.util.MediaAttachmentHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -590,6 +598,7 @@ fun ChannelFeedDialog(
         allowFollowerPosts: Boolean,
         allowReactions: Boolean
     ) -> Unit = { _, _, _, _, _, _ -> },
+    onUpdateChannelIcon: (String?) -> Unit = {},
     onToggleChannelAdmin: (targetUserId: String, makeAdmin: Boolean) -> Unit = { _, _ -> },
     onDeleteChannel: () -> Unit = {},
     onShareInvite: () -> Unit = {},
@@ -630,21 +639,47 @@ fun ChannelFeedDialog(
                         }
                     },
                     title = {
-                        Column {
-                            Text(
-                                text = channel.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${channel.category} • ${if (channel.isPublic) "Public" else "Invite-only"} • ${channel.followerCount} followers",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = SatTeal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(SatElectricBlue.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!channel.iconUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = channel.iconUrl,
+                                        contentDescription = channel.name,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Campaign,
+                                        contentDescription = null,
+                                        tint = SatElectricBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = channel.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${channel.category} • ${if (channel.isPublic) "Public" else "Invite-only"} • ${channel.followerCount} followers",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SatTeal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     },
                     actions = {
@@ -1006,6 +1041,7 @@ fun ChannelFeedDialog(
                 onUpdateChannelSettings(name, desc, cat, isPublic, allowFollowerPosts, allowReactions)
                 showSettingsDialog = false
             },
+            onUpdateIcon = onUpdateChannelIcon,
             onOpenManageAdmins = {
                 showSettingsDialog = false
                 showAdminsDialog = true
@@ -1061,12 +1097,32 @@ private fun CreateChannelDialog(
         allowReactions: Boolean
     ) -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var channelName by remember { mutableStateOf("") }
     var channelDesc by remember { mutableStateOf("") }
+    var channelIconUrl by remember { mutableStateOf<String?>(null) }
     var selectedCategory by remember { mutableStateOf("General") }
     var isPublic by remember { mutableStateOf(true) }
     var allowFollowerPosts by remember { mutableStateOf(false) }
     var allowReactions by remember { mutableStateOf(true) }
+
+    val channelIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                if (encoded != null) {
+                    channelIconUrl = encoded
+                } else {
+                    Toast.makeText(context, "Could not process selected channel icon.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1090,6 +1146,54 @@ private fun CreateChannelDialog(
                     Text(text = "Create Flexible Channel", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     IconButton(onClick = onDismiss) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(SatElectricBlue.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!channelIconUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = channelIconUrl,
+                                contentDescription = "Channel Icon Preview",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(imageVector = Icons.Default.Campaign, contentDescription = null, tint = SatElectricBlue, modifier = Modifier.size(28.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            channelIconPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("create_channel_pick_icon_button")
+                    ) {
+                        Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (channelIconUrl != null) "Change Icon" else "Pick Channel Icon")
+                    }
+                    if (channelIconUrl != null) {
+                        IconButton(
+                            onClick = { channelIconUrl = null },
+                            modifier = Modifier.testTag("create_channel_remove_icon_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.DeleteOutline, contentDescription = "Remove channel icon", tint = SatErrorRed)
+                        }
                     }
                 }
 
@@ -1180,7 +1284,7 @@ private fun CreateChannelDialog(
                         onCreate(
                             channelName,
                             channelDesc.ifBlank { null },
-                            null,
+                            channelIconUrl,
                             selectedCategory,
                             isPublic,
                             allowFollowerPosts,
@@ -1214,9 +1318,13 @@ private fun ChannelSettingsDialog(
         allowFollowerPosts: Boolean,
         allowReactions: Boolean
     ) -> Unit,
+    onUpdateIcon: (String?) -> Unit = {},
     onOpenManageAdmins: () -> Unit = {},
     onDeleteChannel: () -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isProcessingIcon by remember { mutableStateOf(false) }
     var name by remember(channel.id) { mutableStateOf(channel.name) }
     var description by remember(channel.id) { mutableStateOf(channel.description ?: "") }
     var category by remember(channel.id) { mutableStateOf(channel.category.ifBlank { "General" }) }
@@ -1224,6 +1332,25 @@ private fun ChannelSettingsDialog(
     var allowFollowerPosts by remember(channel.id) { mutableStateOf(channel.allowFollowerPosts) }
     var allowReactions by remember(channel.id) { mutableStateOf(channel.allowReactions) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val channelIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            isProcessingIcon = true
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                isProcessingIcon = false
+                if (encoded != null) {
+                    onUpdateIcon(encoded)
+                } else {
+                    Toast.makeText(context, "Could not compress channel icon under cloud size limit.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1247,6 +1374,60 @@ private fun ChannelSettingsDialog(
                     Text(text = "Channel Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     IconButton(onClick = onDismiss) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(SatElectricBlue.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!channel.iconUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = channel.iconUrl,
+                                contentDescription = channel.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(imageVector = Icons.Default.Campaign, contentDescription = null, tint = SatElectricBlue, modifier = Modifier.size(28.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = {
+                                channelIconPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isProcessingIcon,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("channel_change_icon_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (isProcessingIcon) "Updating..." else "Change Channel Icon")
+                        }
+                        if (!channel.iconUrl.isNullOrBlank()) {
+                            TextButton(
+                                onClick = { onUpdateIcon(null) },
+                                enabled = !isProcessingIcon,
+                                modifier = Modifier.testTag("channel_remove_icon_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.DeleteOutline, contentDescription = null, tint = SatErrorRed, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Remove Icon", color = SatErrorRed)
+                            }
+                        }
                     }
                 }
 

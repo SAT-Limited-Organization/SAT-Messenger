@@ -5,9 +5,13 @@ import com.example.R
 import com.example.data.model.AvailabilityStatus
 import com.example.data.model.BlockedUser
 import com.example.data.model.ContactEntry
+import com.example.data.model.FriendRequest
 import com.example.data.model.PrivacySettings
 import com.example.data.model.Report
 import com.example.data.model.UserProfile
+import com.example.util.UserSearchMatcher
+import com.example.util.UsernameChangeEvaluation
+import com.example.util.UsernamePolicy
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -42,14 +46,16 @@ class UserRepository(private val db: FirebaseFirestore) {
         val userDoc = db.collection("users").document(uid)
         return try {
             val existingSnapshot = userDoc.get().await()
+            val primaryUsername = profile.resolvedPrimaryUsername
             if (!existingSnapshot.exists()) {
                 val safeName = profile.displayName.trim()
-                    .ifBlank { profile.email.substringBefore("@").ifBlank { "SAT Member" } }
+                    .ifBlank { primaryUsername.ifBlank { "SAT Member" } }
                     .take(100)
                 val payload = mutableMapOf<String, Any>(
                     "userId" to uid,
                     "displayName" to safeName,
                     "email" to profile.email,
+                    "primaryUsername" to primaryUsername,
                     "availabilityStatus" to profile.availabilityStatus,
                     "isOnline" to true,
                     "lastSeen" to FieldValue.serverTimestamp(),
@@ -73,6 +79,9 @@ class UserRepository(private val db: FirebaseFirestore) {
                     "lastSeen" to FieldValue.serverTimestamp(),
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
+                if (existingSnapshot.getString("primaryUsername").isNullOrBlank() && primaryUsername.isNotBlank()) {
+                    updates["primaryUsername"] = primaryUsername
+                }
                 if (existingSnapshot.getString("avatarUrl").isNullOrBlank() && !profile.avatarUrl.isNullOrBlank()) {
                     updates["avatarUrl"] = profile.avatarUrl
                 }
@@ -93,13 +102,15 @@ class UserRepository(private val db: FirebaseFirestore) {
         val userDoc = db.collection("users").document(uid)
         return try {
             val existingSnapshot = userDoc.get().await()
+            val primaryUsername = profile.resolvedPrimaryUsername
             val safeName = profile.displayName.trim()
-                .ifBlank { profile.email.substringBefore("@").ifBlank { "SAT Member" } }
+                .ifBlank { primaryUsername.ifBlank { "SAT Member" } }
                 .take(100)
             val payload = mutableMapOf<String, Any>(
                 "userId" to uid,
                 "displayName" to safeName,
                 "email" to profile.email,
+                "primaryUsername" to primaryUsername,
                 "availabilityStatus" to profile.availabilityStatus,
                 "isOnline" to profile.isOnline,
                 "lastSeen" to FieldValue.serverTimestamp(),
@@ -108,6 +119,17 @@ class UserRepository(private val db: FirebaseFirestore) {
             profile.phoneNumber?.let { payload["phoneNumber"] = it }
             profile.avatarUrl?.let { payload["avatarUrl"] = it }
             profile.statusMessage?.let { payload["statusMessage"] = it }
+            profile.secondaryUsername?.takeIf { it.isNotBlank() }?.let {
+                payload["secondaryUsername"] = it
+                payload["secondaryUsernameLower"] = it.lowercase()
+            }
+            profile.secondaryUsernameDayKey?.let { payload["secondaryUsernameDayKey"] = it }
+            if (profile.secondaryUsernameChangesInDay > 0) {
+                payload["secondaryUsernameChangesInDay"] = profile.secondaryUsernameChangesInDay
+            }
+            profile.secondaryUsernameLastChangedAtMs?.let {
+                payload["secondaryUsernameLastChangedAtMs"] = it
+            }
 
             if (!existingSnapshot.exists()) {
                 payload["createdAt"] = FieldValue.serverTimestamp()
@@ -120,6 +142,55 @@ class UserRepository(private val db: FirebaseFirestore) {
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.WRITE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateSecondaryUsername(
+        candidateRaw: String,
+        nowMs: Long = System.currentTimeMillis()
+    ): Result<UsernameChangeEvaluation.Allowed> {
+        val uid = requireUserId()
+        val path = "users/$uid"
+        val userDoc = db.collection("users").document(uid)
+        return try {
+            val snapshot = userDoc.get().await()
+            val currentProfile = snapshot.toObject(UserProfile::class.java)
+                ?: return Result.failure(IllegalStateException("Profile not synced yet."))
+
+            val normalized = UsernamePolicy.normalize(candidateRaw)
+            val lower = normalized.lowercase()
+
+            // Verify uniqueness against all registered users before applying policy
+            val conflictDocs = db.collection("users")
+                .whereEqualTo("secondaryUsernameLower", lower)
+                .get()
+                .await()
+            val otherClaimedUsers = conflictDocs.toObjects(UserProfile::class.java)
+
+            when (val evaluation = UsernamePolicy.evaluateChange(currentProfile, candidateRaw, nowMs, otherClaimedUsers)) {
+                is UsernameChangeEvaluation.Rejected -> {
+                    Result.failure(IllegalArgumentException(evaluation.reason))
+                }
+                is UsernameChangeEvaluation.Allowed -> {
+                    val updates = mutableMapOf<String, Any>(
+                        "secondaryUsername" to evaluation.normalizedUsername,
+                        "secondaryUsernameLower" to evaluation.normalizedLower,
+                        "secondaryUsernameDayKey" to evaluation.nextDayKey,
+                        "secondaryUsernameChangesInDay" to evaluation.nextChangesInDay,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                    evaluation.nextLastChangedAtMs?.let {
+                        updates["secondaryUsernameLastChangedAtMs"] = it
+                    }
+                    userDoc.update(updates).await()
+                    Result.success(evaluation)
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
             Result.failure(e)
         }
     }
@@ -156,18 +227,25 @@ class UserRepository(private val db: FirebaseFirestore) {
                 if (trimmed.isBlank()) {
                     list
                 } else {
-                    list.filter { user ->
-                        user.displayName.contains(trimmed, ignoreCase = true) ||
-                                user.email.contains(trimmed, ignoreCase = true) ||
-                                (user.phoneNumber != null && user.phoneNumber.contains(trimmed, ignoreCase = true)) ||
-                                (user.statusMessage?.contains(trimmed, ignoreCase = true) == true)
-                    }
+                    list.filter { user -> UserSearchMatcher.matches(user, trimmed) }
                 }
             }
             .catch { error ->
                 if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
                 emit(emptyList())
             }
+    }
+
+    suspend fun fetchAllDirectoryUsers(): List<UserProfile> {
+        val path = "users"
+        return try {
+            db.collection("users").get().await().toObjects(UserProfile::class.java)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.LIST, path)
+            emptyList()
+        }
     }
 
     suspend fun updateUserProfile(displayName: String, statusMessage: String, phoneNumber: String? = null): Result<Unit> {
@@ -184,6 +262,25 @@ class UserRepository(private val db: FirebaseFirestore) {
             }
             db.collection("users").document(uid).update(payload).await()
             Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateProfileAvatar(avatarUrl: String?): Result<Unit> {
+        val uid = requireUserId()
+        val path = "users/$uid"
+        return try {
+            val cleanUrl = avatarUrl?.trim()?.takeIf { it.isNotBlank() }
+            val payload = mapOf<String, Any>(
+                "avatarUrl" to (cleanUrl ?: FieldValue.delete()),
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            db.collection("users").document(uid).update(payload).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, path)
             Result.failure(e)
@@ -285,6 +382,152 @@ class UserRepository(private val db: FirebaseFirestore) {
             db.collection("users").document(uid)
                 .collection("contacts").document(targetUserId)
                 .delete().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, path)
+            Result.failure(e)
+        }
+    }
+
+    // ==========================================
+    // Friend Requests & Mutual Friendships
+    // ==========================================
+
+    fun observeFriendRequests(userId: String): Flow<List<FriendRequest>> {
+        val path = "friendRequests"
+        return db.collection("friendRequests")
+            .whereArrayContains("participantIds", userId)
+            .snapshots()
+            .map { snapshot ->
+                snapshot.toObjects(FriendRequest::class.java)
+                    .sortedByDescending { it.updatedAt?.seconds ?: it.createdAt?.seconds ?: 0L }
+            }
+            .catch { error ->
+                if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
+                emit(emptyList())
+            }
+    }
+
+    suspend fun sendFriendRequest(
+        targetUser: UserProfile,
+        currentProfile: UserProfile
+    ): Result<String> {
+        val uid = requireUserId()
+        if (targetUser.userId.isBlank() || targetUser.userId == uid) {
+            return Result.failure(IllegalArgumentException("Cannot send a friend request to yourself."))
+        }
+        val pairId = FriendRequest.pairId(uid, targetUser.userId)
+        val path = "friendRequests/$pairId"
+        val docRef = db.collection("friendRequests").document(pairId)
+        return try {
+            val existing = docRef.get().await()
+            if (existing.exists()) {
+                val existingReq = existing.toObject(FriendRequest::class.java)
+                if (existingReq != null) {
+                    when (existingReq.status) {
+                        "accepted" -> return Result.success("already_friends")
+                        "pending" -> {
+                            // If target already sent us a pending request, accept it immediately!
+                            if (existingReq.toUserId == uid) {
+                                docRef.update(
+                                    mapOf(
+                                        "status" to "accepted",
+                                        "updatedAt" to FieldValue.serverTimestamp()
+                                    )
+                                ).await()
+                                setContactRelationship(targetUser.userId, "friend")
+                                return Result.success("accepted")
+                            }
+                            return Result.success("pending")
+                        }
+                        "declined" -> {
+                            // Allow re-request by recreating or resetting when sender
+                            if (existingReq.fromUserId == uid) {
+                                docRef.update(
+                                    mapOf(
+                                        "status" to "pending",
+                                        "updatedAt" to FieldValue.serverTimestamp()
+                                    )
+                                ).await()
+                                return Result.success("pending")
+                            } else {
+                                docRef.delete().await()
+                            }
+                        }
+                    }
+                }
+            }
+
+            val payload = mutableMapOf<String, Any>(
+                "id" to pairId,
+                "fromUserId" to uid,
+                "fromUserName" to currentProfile.username.take(100),
+                "toUserId" to targetUser.userId,
+                "toUserName" to targetUser.username.take(100),
+                "participantIds" to listOf(uid, targetUser.userId),
+                "status" to "pending",
+                "createdAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            currentProfile.avatarUrl?.takeIf { it.isNotBlank() }?.let {
+                payload["fromUserAvatarUrl"] = it
+            }
+            targetUser.avatarUrl?.takeIf { it.isNotBlank() }?.let {
+                payload["toUserAvatarUrl"] = it
+            }
+            docRef.set(payload).await()
+            Result.success("pending")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun respondToFriendRequest(request: FriendRequest, accept: Boolean): Result<Unit> {
+        val uid = requireUserId()
+        val path = "friendRequests/${request.id}"
+        return try {
+            val nextStatus = if (accept) "accepted" else "declined"
+            db.collection("friendRequests").document(request.id)
+                .update(
+                    mapOf(
+                        "status" to nextStatus,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            if (accept) {
+                val otherId = if (request.fromUserId == uid) request.toUserId else request.fromUserId
+                if (otherId.isNotBlank()) {
+                    setContactRelationship(otherId, "friend")
+                }
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun cancelOrRemoveFriend(targetUserId: String): Result<Unit> {
+        val uid = requireUserId()
+        val pairId = FriendRequest.pairId(uid, targetUserId)
+        val path = "friendRequests/$pairId"
+        return try {
+            val docRef = db.collection("friendRequests").document(pairId)
+            val snap = docRef.get().await()
+            if (snap.exists()) {
+                docRef.delete().await()
+            }
+            try {
+                removeSavedContact(targetUserId)
+            } catch (_: Exception) {
+            }
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e

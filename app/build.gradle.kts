@@ -19,8 +19,8 @@ android {
     applicationId = "com.aistudio.satmessenger.satlim"
     minSdk = 24
     targetSdk = 36
-    versionCode = 4
-    versionName = "3.2.07.11.2026.14.5.0"
+    versionCode = 5
+    versionName = "4.2.07.11.2026.14.5.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

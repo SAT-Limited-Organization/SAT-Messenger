@@ -3,9 +3,14 @@ package com.example.ui.screens.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +35,7 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ExitToApp
@@ -42,6 +48,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -51,6 +58,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -68,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,6 +103,10 @@ import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatTeal
+import com.example.util.MediaAttachmentHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -113,13 +126,41 @@ fun ChatDetailsScreen(
     onAddParticipants: (() -> Unit)? = null,
     onShareGroupInvite: (() -> Unit)? = null,
     onToggleGroupAdmin: ((targetUserId: String, makeAdmin: Boolean) -> Unit)? = null,
+    onUpdateGroupIcon: ((String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val isGroup = chat.type == "group"
     val callerCanManageAdmins = isGroup &&
         (chat.createdBy == currentUserId || chat.adminIds.contains(currentUserId))
+    val canEditGroupIcon = isGroup && onUpdateGroupIcon != null &&
+        (callerCanManageAdmins || (chat.adminIds.isEmpty() && chat.createdBy.isBlank() && chat.memberIds.contains(currentUserId)))
+
+    var isProcessingGroupIcon by remember { mutableStateOf(false) }
+    val groupIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null && onUpdateGroupIcon != null) {
+            isProcessingGroupIcon = true
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                isProcessingGroupIcon = false
+                if (encoded != null) {
+                    onUpdateGroupIcon(encoded)
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Selected group icon could not be compressed under cloud size limit.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
 
     val otherMemberId = chat.memberIds.firstOrNull { it != currentUserId }
     val otherUser = directoryUsers.firstOrNull { it.userId == otherMemberId }
@@ -219,14 +260,48 @@ fun ChatDetailsScreen(
                             .fillMaxWidth()
                             .padding(vertical = 24.dp, horizontal = 16.dp)
                     ) {
-                        UserAvatar(
-                            name = title,
-                            avatarUrl = otherUser?.avatarUrl,
-                            isOnline = if (isGroup) false else isOnline,
-                            availabilityStatus = if (isGroup) null else otherAvailability,
-                            isGroup = isGroup,
-                            size = 96.dp
-                        )
+                        Box(
+                            contentAlignment = Alignment.BottomEnd,
+                            modifier = if (canEditGroupIcon) {
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable(enabled = !isProcessingGroupIcon) {
+                                        groupIconPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    }
+                            } else {
+                                Modifier
+                            }
+                        ) {
+                            UserAvatar(
+                                name = title,
+                                avatarUrl = if (isGroup) chat.iconUrl else otherUser?.avatarUrl,
+                                isOnline = if (isGroup) false else isOnline,
+                                availabilityStatus = if (isGroup) null else otherAvailability,
+                                isGroup = isGroup,
+                                size = 96.dp
+                            )
+                            if (canEditGroupIcon) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = SatTeal,
+                                    shadowElevation = 3.dp,
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .border(2.dp, SatNavyDark, CircleShape)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoCamera,
+                                            contentDescription = "Change group icon",
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
@@ -274,6 +349,49 @@ fun ChatDetailsScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.75f)
                             )
+                            if (canEditGroupIcon) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            groupIconPickerLauncher.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                            )
+                                        },
+                                        enabled = !isProcessingGroupIcon,
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SatTeal),
+                                        modifier = Modifier.testTag("group_change_icon_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoCamera,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(if (isProcessingGroupIcon) "Updating..." else "Change Group Icon")
+                                    }
+                                    if (!chat.iconUrl.isNullOrBlank()) {
+                                        TextButton(
+                                            onClick = { onUpdateGroupIcon?.invoke(null) },
+                                            enabled = !isProcessingGroupIcon,
+                                            modifier = Modifier.testTag("group_remove_icon_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DeleteOutline,
+                                                contentDescription = null,
+                                                tint = SatErrorRed,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Remove Icon", color = SatErrorRed)
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))

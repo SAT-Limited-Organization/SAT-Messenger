@@ -35,8 +35,8 @@
           Search by keyword or filter by category below.
         </p>
         <div class="badge-row">
-          <span class="pill teal">19 Feature Guides</span>
-          <span class="pill blue">Synced with App v2.2.07.11.2026.14.5.0</span>
+          <span class="pill teal">20 Feature Guides</span>
+          <span class="pill blue">Synced with App v4.2.07.11.2026.14.5.1 (Build 5)</span>
         </div>
       </div>
     </section>
@@ -63,7 +63,8 @@
   <footer class="site-footer">
     <p>
       <strong>SAT Messenger</strong> · <a href="index.html">Overview &amp; Downloads</a> ·
-      <a href="architecture.html">Architecture &amp; CI/CD</a>
+      <a href="architecture.html">Architecture &amp; CI/CD</a> ·
+      <a href="privacy.html">Privacy Policy</a>
     </p>
   </footer>
 
@@ -85,13 +86,13 @@
         category: "Contacts & Availability",
         badge: "Live Sync",
         title: "Contacts Sync & Real-Time Availability",
-        summary: "View all Firestore-synced friends and colleagues with real-time online status and availability badges.",
+        summary: "Discover registered SAT Messenger users saved in your phone contacts, send friend requests, and view live availability.",
         steps: [
           "Tap the 'Contacts' tab on the bottom navigation bar to open your live contact directory.",
-          "Set your own real-time availability at the top ('Available', 'Busy', 'Away', 'In a Meeting', or 'Do Not Disturb') — changes sync instantly to other users.",
-          "Filter contacts by All, Online, Friends, or Colleagues, or search by name, @handle, email, phone, or availability.",
-          "Tap the Star icon next to any contact to add or remove them from your personal Friends list.",
-          "Tap any contact row to inspect their live availability, Last Seen timestamp, email, or phone number, or tap Message to open a chat."
+          "Tap 'Find' on the Device Contacts card to grant Contacts permission and automatically highlight registered SAT Messenger users saved on your phone.",
+          "Send friend requests by tapping the Star/Add icon on any user (or from Profile/Search) and accept or decline incoming requests in the Requests filter.",
+          "Filter contacts by All, Online, Friends, On Device, Requests, or Colleagues, and search by registered name, @primary/@secondary username, email, phone number, or availability.",
+          "Set your own real-time availability at the top ('Available', 'Busy', 'Away', 'In a Meeting', or 'Do Not Disturb')."
         ],
         tip: "Green = Available, Blue = In a Meeting, Amber = Away, Red = Busy / Do Not Disturb, Gray = Offline with relative Last Seen time."
       },
@@ -259,13 +260,15 @@
       {
         category: "Search & Details",
         badge: "Directory",
-        title: "Global Search & Contact Info",
-        summary: "Find people by name, @username, email, or phone number and inspect rich Contact Info.",
+        title: "Global Search, Usernames & Contact Info",
+        summary: "Search registered users by Registered Name, Email, Phone Number, Primary Username, or Secondary Username.",
         steps: [
-          "Tap the person-search icon in the Chats top bar for quick global lookup, or use the Contacts tab.",
+          "Your Primary Username comes automatically from the part of your email before '@'.",
+          "In Profile & Settings > SAT Messenger Usernames, claim any unpicked Secondary Username. Once set, you can change it up to 3 times on an active change day, followed by a 10-day cooldown.",
+          "Tap the person-search icon in the Chats top bar (or use Contacts / New Chat) to search by name, email, phone number, primary @username, or secondary @username.",
           "Inside any chat, tap the top bar title to open Contact / Group Info with copyable email/phone, shared media, and chat management."
         ],
-        tip: "Keep your phone number updated in Profile > Profile Details so contacts can reach you quickly."
+        tip: "Keep your phone number updated in Profile > Profile Details so device contact discovery can match you."
       },
       {
         category: "Chat Management",
@@ -291,15 +294,28 @@
         tip: "Compliance reports are logged securely to a restricted Firestore collection."
       },
       {
+        category: "Icons & Photos",
+        badge: "Customization",
+        title: "Profile, Group, Channel & Community Icons",
+        summary: "Customize or remove photos and icons for your Profile, Group Rooms, Channels, and Communities.",
+        steps: [
+          "Profile Photo: Open Profile & Settings, tap your avatar camera badge or 'Change Photo', and pick any image via the zero-permission Photo Picker (or tap 'Remove' to revert to initials).",
+          "Group Room Icon: Pick a group icon while creating a room in '+' > New Group, or open Group Info as a group admin and tap 'Change Group Icon' / 'Remove Icon'.",
+          "Channel Icon: Choose a channel icon during creation or open Channel Settings as a channel admin to change or remove it.",
+          "Community Icon: Pick an icon when starting a community, or tap the Camera icon button on any community card you admin to change or remove its icon."
+        ],
+        tip: "Images are compressed automatically and synced across all members in Cloud Firestore without broad storage permissions."
+      },
+      {
         category: "Downloads & Updates",
         badge: "Distribution",
         title: "Downloads, Updates & Sideloading",
-        summary: "Install SAT Messenger cleanly from GitHub Releases, Obtainium, Play Store, or verified mirrors.",
+        summary: "Install SAT Messenger cleanly from GitHub Releases, Obtainium, Play Store, or verified mirrors and check updates in-app.",
         steps: [
           "Download the latest APK or AAB directly from the GitHub Releases page (sat-messenger-release.apk for production or sat-messenger-debug.apk for QA).",
           "When sideloading an APK outside an app store, enable 'Install unknown apps' for your browser or file manager when Android prompts.",
           "Track automatic updates via Obtainium by adding https://github.com/SAT-Limited-Organization/SAT-Messenger, and verify downloaded packages against SHA256SUMS.txt.",
-          "Check your currently installed version number anytime at the bottom of your Profile screen."
+          "Check your currently installed version (v4.2.07.11.2026.14.5.1, Build 5) or tap 'Check for Updates' anytime inside Profile & Settings > App Updates."
         ],
         tip: "Keep the same signing keystore across upgrades so Android installs updates cleanly without uninstalling existing local data."
       }

@@ -1,8 +1,15 @@
 package com.example.ui.screens.profile
 
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.BuildConfig
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,14 +30,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
@@ -58,11 +68,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -80,6 +92,11 @@ import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatTeal
+import com.example.util.MediaAttachmentHelper
+import com.example.util.UsernamePolicy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +106,9 @@ fun ProfileScreen(
     blockedUsers: List<BlockedUser>,
     onBack: () -> Unit,
     onUpdateProfile: (name: String, status: String, phoneNumber: String?) -> Unit,
+    onUpdateAvatar: (String?) -> Unit = {},
+    onUpdateSecondaryUsername: (String) -> Unit = {},
+    secondaryUsernameFeedback: Pair<Boolean, String>? = null,
     onUpdateAvailability: (AvailabilityStatus) -> Unit = {},
     onUpdatePrivacy: (readReceipts: Boolean, lastSeenVisible: Boolean) -> Unit,
     onUnblockUser: (String) -> Unit,
@@ -108,9 +128,41 @@ fun ProfileScreen(
 ) {
     BackHandler { onBack() }
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isProcessingPhoto by remember { mutableStateOf(false) }
+    val avatarPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            isProcessingPhoto = true
+            coroutineScope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    MediaAttachmentHelper.encodeIconOrAvatarDataUrl(context, uri)
+                }
+                isProcessingPhoto = false
+                if (encoded != null) {
+                    onUpdateAvatar(encoded)
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Selected photo could not be compressed under cloud size limit.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
     var displayName by remember(userProfile) { mutableStateOf(userProfile?.displayName ?: "") }
     var statusMessage by remember(userProfile) { mutableStateOf(userProfile?.statusMessage ?: "") }
     var phoneNumber by remember(userProfile) { mutableStateOf(userProfile?.phoneNumber ?: "") }
+    var secondaryUsernameInput by remember(userProfile?.secondaryUsername) {
+        mutableStateOf(userProfile?.secondaryUsername ?: "")
+    }
+    val secondaryUsernameStatus = remember(userProfile) {
+        UsernamePolicy.describeStatus(userProfile)
+    }
     var readReceipts by remember(privacySettings) { mutableStateOf(privacySettings.readReceipts) }
     var lastSeenVisible by remember(privacySettings) { mutableStateOf(privacySettings.lastSeenVisible) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -165,30 +217,108 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    UserAvatar(
-                        name = displayName.ifBlank { "User" },
-                        avatarUrl = userProfile?.avatarUrl,
-                        isOnline = userProfile?.isOnline ?: true,
-                        availabilityStatus = userProfile?.resolvedAvailability(),
-                        size = 84.dp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    val resolvedUsername = userProfile?.email?.substringBefore("@")?.takeIf { it.isNotBlank() } ?: "User"
+                    Box(
+                        contentAlignment = Alignment.BottomEnd,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(enabled = !isProcessingPhoto) {
+                                avatarPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                    ) {
+                        UserAvatar(
+                            name = displayName.ifBlank { "User" },
+                            avatarUrl = userProfile?.avatarUrl,
+                            isOnline = userProfile?.isOnline ?: true,
+                            availabilityStatus = userProfile?.resolvedAvailability(),
+                            size = 92.dp
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = SatElectricBlue,
+                            shadowElevation = 3.dp,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoCamera,
+                                    contentDescription = "Change profile photo",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                avatarPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isProcessingPhoto,
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.testTag("profile_change_photo_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (isProcessingPhoto) "Updating..." else "Change Photo")
+                        }
+                        if (!userProfile?.avatarUrl.isNullOrBlank()) {
+                            TextButton(
+                                onClick = { onUpdateAvatar(null) },
+                                enabled = !isProcessingPhoto,
+                                modifier = Modifier.testTag("profile_remove_photo_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = null,
+                                    tint = SatErrorRed,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Remove Photo", color = SatErrorRed)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val resolvedUsername = userProfile?.resolvedPrimaryUsername?.takeIf { it.isNotBlank() } ?: "User"
                     val resolvedDisplayName = displayName.takeIf { it.isNotBlank() } ?: resolvedUsername
                     Text(
                         text = resolvedDisplayName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    if (userProfile?.email?.isNotBlank() == true) {
+                    if (userProfile?.resolvedPrimaryUsername?.isNotBlank() == true) {
                         Text(
-                            text = "@${userProfile.email.substringBefore("@")}",
+                            text = "Primary: ${userProfile.primaryUsernameHandle}",
                             style = MaterialTheme.typography.titleSmall,
                             color = SatTeal,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.testTag("profile_primary_username_text")
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                     }
+                    userProfile?.secondaryUsernameHandle?.let { secondaryHandle ->
+                        Text(
+                            text = "Secondary: $secondaryHandle",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = SatElectricBlue,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.testTag("profile_secondary_username_text")
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = userProfile?.email ?: "",
                         style = MaterialTheme.typography.bodyMedium,
@@ -305,6 +435,126 @@ fun ProfileScreen(
                             Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Save Profile")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Usernames Card (Primary + Secondary)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.AlternateEmail, contentDescription = null, tint = SatTeal)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "SAT Messenger Usernames",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = SatTeal.copy(alpha = 0.12f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Primary Username (from email)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SatTeal,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = userProfile?.primaryUsernameHandle ?: "@user",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "Secondary Username (Unique Handle)",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = secondaryUsernameStatus.statusSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (secondaryUsernameStatus.canChangeNow) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                SatErrorRed
+                            },
+                            modifier = Modifier.testTag("secondary_username_policy_status")
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = secondaryUsernameInput,
+                            onValueChange = { secondaryUsernameInput = it.replace(" ", "") },
+                            label = { Text("Choose Unpicked Secondary Username") },
+                            placeholder = { Text("e.g. sat_commander") },
+                            prefix = { Text("@") },
+                            enabled = secondaryUsernameStatus.canChangeNow,
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("secondary_username_input")
+                        )
+
+                        if (secondaryUsernameFeedback != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (secondaryUsernameFeedback.first) {
+                                    SatOnlineGreen.copy(alpha = 0.14f)
+                                } else {
+                                    SatErrorRed.copy(alpha = 0.14f)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = secondaryUsernameFeedback.second,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (secondaryUsernameFeedback.first) SatOnlineGreen else SatErrorRed,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = { onUpdateSecondaryUsername(secondaryUsernameInput) },
+                            enabled = secondaryUsernameStatus.canChangeNow && secondaryUsernameInput.isNotBlank(),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("save_secondary_username_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.AlternateEmail, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                if (secondaryUsernameStatus.currentUsername == null) {
+                                    "Claim Secondary Username"
+                                } else {
+                                    "Change Secondary Username (${secondaryUsernameStatus.remainingChangesToday}/3 today)"
+                                }
+                            )
                         }
                     }
                 }

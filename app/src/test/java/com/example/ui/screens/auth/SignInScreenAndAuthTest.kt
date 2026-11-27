@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
+import com.example.BuildConfig
 import com.example.data.repository.AuthRepository
 import com.example.data.repository.AuthUiState
 import com.example.ui.theme.SATMessengerTheme
@@ -154,5 +155,23 @@ class SignInScreenAndAuthTest {
 
         composeRule.onNodeWithText("SAT Messenger Manual").assertIsDisplayed()
         composeRule.onNodeWithText("Registration & Sign-In (Google)").assertIsDisplayed()
+    }
+
+    @Test
+    fun signInScreen_displaysCurrentBuildConfigVersionFooter() {
+        composeRule.setContent {
+            SATMessengerTheme {
+                SignInScreen(
+                    authState = AuthUiState.Unauthenticated,
+                    onGoogleSignInClick = {}
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("signin_app_version_text").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "SAT Messenger v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+        ).assertIsDisplayed()
     }
 }

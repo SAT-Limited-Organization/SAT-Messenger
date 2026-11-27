@@ -79,6 +79,15 @@ object MediaAttachmentHelper {
         }
     }
 
+    fun encodeIconOrAvatarDataUrl(context: Context, uri: Uri): String? {
+        return encodeImageUriToDataUrl(
+            context = context,
+            uri = uri,
+            maxDim = 480,
+            maxEncodedChars = 350_000
+        )
+    }
+
     fun encodeVisualMedia(context: Context, uri: Uri): EncodedMediaResult {
         val mime = context.contentResolver.getType(uri).orEmpty().lowercase()
         val (displayName, sizeBytes) = getFileMetadata(context, uri)

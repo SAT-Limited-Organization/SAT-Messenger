@@ -168,7 +168,8 @@ class ChatRepository(private val db: FirebaseFirestore) {
         name: String,
         description: String? = null,
         selectedMemberIds: List<String>,
-        currentUserName: String
+        currentUserName: String,
+        iconUrl: String? = null
     ): Result<String> {
         val uid = requireUserId()
         val roomId = UUID.randomUUID().toString()
@@ -195,6 +196,9 @@ class ChatRepository(private val db: FirebaseFirestore) {
             description?.let {
                 if (it.isNotBlank()) payload["description"] = it.trim()
             }
+            iconUrl?.trim()?.takeIf { it.isNotBlank() }?.let {
+                payload["iconUrl"] = it
+            }
 
             db.collection("chatRooms").document(roomId).set(payload).await()
             InviteRepository.createInviteDocument(
@@ -216,9 +220,10 @@ class ChatRepository(private val db: FirebaseFirestore) {
     suspend fun createGroupChat(
         name: String,
         selectedMemberIds: List<String>,
-        currentUserName: String
+        currentUserName: String,
+        iconUrl: String? = null
     ): Result<String> {
-        return createGroupRoom(name, null, selectedMemberIds, currentUserName)
+        return createGroupRoom(name, null, selectedMemberIds, currentUserName, iconUrl)
     }
 
     fun observeMessages(chatId: String): Flow<List<Message>> {
@@ -482,6 +487,44 @@ class ChatRepository(private val db: FirebaseFirestore) {
             docRef.update(
                 mapOf(
                     "adminIds" to updatedAdmins,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateGroupIcon(chatId: String, iconUrl: String?): Result<Unit> {
+        val uid = requireUserId()
+        val collection = resolveChatCollection(chatId)
+        val path = "$collection/$chatId"
+        return try {
+            val docRef = db.collection(collection).document(chatId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalArgumentException("Group room not found."))
+            }
+            if (collection == "chats" && snapshot.getString("type") != "group") {
+                return Result.failure(IllegalStateException("Icons are supported for group rooms only."))
+            }
+            val memberIds = (snapshot.get("memberIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val adminIds = (snapshot.get("adminIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val createdBy = snapshot.getString("createdBy").orEmpty()
+            val callerAllowed = if (adminIds.isNotEmpty() || createdBy.isNotBlank()) {
+                uid == createdBy || adminIds.contains(uid)
+            } else {
+                memberIds.contains(uid)
+            }
+            if (!callerAllowed) {
+                return Result.failure(IllegalStateException("Only group admins can update the group icon."))
+            }
+            val cleanIcon = iconUrl?.trim()?.takeIf { it.isNotBlank() }
+            docRef.update(
+                mapOf(
+                    "iconUrl" to (cleanIcon ?: FieldValue.delete()),
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()

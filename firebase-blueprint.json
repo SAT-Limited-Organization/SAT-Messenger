@@ -8,6 +8,12 @@
         "userId": { "type": "string", "description": "Unique user ID matching Auth UID" },
         "displayName": { "type": "string", "description": "Full name or corporate handle" },
         "email": { "type": "string", "description": "Corporate or account email" },
+        "primaryUsername": { "type": "string", "description": "Local part of email before @" },
+        "secondaryUsername": { "type": "string", "description": "Unique custom handle (up to 3 changes/day, 10-day cooldown)" },
+        "secondaryUsernameLower": { "type": "string", "description": "Lowercase unique secondary username key" },
+        "secondaryUsernameDayKey": { "type": "string", "description": "UTC date key yyyy-MM-dd for daily limit tracking" },
+        "secondaryUsernameChangesInDay": { "type": "integer", "description": "Changes used on active change day (max 3)" },
+        "secondaryUsernameLastChangedAtMs": { "type": "integer", "description": "Epoch ms of last secondary username change" },
         "phoneNumber": { "type": "string", "description": "Optional contact phone number or extension" },
         "avatarUrl": { "type": "string", "description": "Optional profile image URL or base64 placeholder" },
         "statusMessage": { "type": "string", "description": "Current status message or title at SAT Limited" },
@@ -18,6 +24,25 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Profile update timestamp" }
       },
       "required": ["userId", "displayName", "email", "createdAt"]
+    },
+    "FriendRequest": {
+      "title": "FriendRequest",
+      "description": "Two-way friend request between SAT Messenger users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Deterministic pair ID" },
+        "fromUserId": { "type": "string", "description": "Sender UID" },
+        "fromUserName": { "type": "string", "description": "Sender display name" },
+        "fromUserAvatarUrl": { "type": "string", "description": "Sender avatar URL" },
+        "toUserId": { "type": "string", "description": "Recipient UID" },
+        "toUserName": { "type": "string", "description": "Recipient display name" },
+        "toUserAvatarUrl": { "type": "string", "description": "Recipient avatar URL" },
+        "participantIds": { "type": "array", "description": "Pair of participant UIDs" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"], "description": "Request state" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "fromUserId", "toUserId", "participantIds", "status", "createdAt"]
     },
     "ContactEntry": {
       "title": "ContactEntry",
@@ -63,6 +88,7 @@
         "id": { "type": "string", "description": "Chat identifier" },
         "type": { "type": "string", "enum": ["direct", "group"], "description": "Conversation category" },
         "name": { "type": "string", "description": "Display name of group chat" },
+        "iconUrl": { "type": "string", "description": "Optional group chat icon URL or data URL" },
         "memberIds": { "type": "array", "description": "List of user IDs participating in the conversation" },
         "adminIds": { "type": "array", "description": "List of group admin user IDs" },
         "lastMessageText": { "type": "string", "description": "Snippet of last message sent" },
@@ -83,6 +109,7 @@
         "id": { "type": "string", "description": "Chat room identifier" },
         "name": { "type": "string", "description": "Display name of group chat room" },
         "description": { "type": "string", "description": "Purpose or departmental charter of the room" },
+        "iconUrl": { "type": "string", "description": "Optional group room icon URL or data URL" },
         "memberIds": { "type": "array", "description": "List of user IDs participating in the chat room" },
         "adminIds": { "type": "array", "description": "List of room administrators" },
         "createdBy": { "type": "string", "description": "UID of room creator" },
@@ -255,6 +282,10 @@
     "/reports/{reportId}": {
       "schema": { "$ref": "#/entities/Report" },
       "description": "Abuse and violation reports"
+    },
+    "/friendRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/FriendRequest" },
+      "description": "Two-way friend requests between SAT Messenger users"
     }
   }
 }

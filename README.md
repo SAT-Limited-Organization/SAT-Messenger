@@ -4,7 +4,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Firebase](https://img.shields.io/badge/Backend-Firebase%20Auth%20%26%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Version](https://img.shields.io/badge/Version-2.2.07.11.2026.14.5.0-0A2540)](app/build.gradle.kts)
+[![Version](https://img.shields.io/badge/Version-4.2.07.11.2026.14.5.1-0A2540)](app/build.gradle.kts)
 [![Docs](https://img.shields.io/badge/Docs-GitHub%20Pages-00BFA5)](https://sat-limited-organization.github.io/SAT-Messenger/)
 
 **SAT Messenger** is a native Kotlin and Jetpack Compose enterprise & team messaging application for **SAT Limited**, built on Material Design 3, Firebase Authentication (Google Credential Manager), and real-time Cloud Firestore synchronization.
@@ -29,7 +29,7 @@
 
 - **All Versioned GitHub Releases:** `https://github.com/SAT-Limited-Organization/SAT-Messenger/releases`
 - **Application ID:** `com.aistudio.satmessenger.satlim`
-- **Version:** `2.2.07.11.2026.14.5.0` (`versionCode: 2`)
+- **Version:** `4.2.07.11.2026.14.5.1` (`versionCode: 5`)
 - **Minimum Android Version:** Android 7.0 (`minSdk 24`, `targetSdk 36`)
 - **Third-Party Store Compatibility:**
   - `dependenciesInfo.includeInApk = false` (avoids encrypted Play-only signing blocks inside APKs for clean scanning/verification on F-Droid-compatible trackers & third-party mirrors).
@@ -39,7 +39,7 @@
 ### Install & Auto-Update Guides
 
 - **GitHub Releases (Direct APK):** Download `sat-messenger-release.apk` (or `sat-messenger-debug.apk`) on Android, tap the downloaded file, and allow **"Install unknown apps"** for your browser or file manager when prompted.
-- **Obtainium (Auto-Updates from GitHub):** Add `https://github.com/SAT-Limited-Organization/SAT-Messenger` in Obtainium to automatically track versioned releases (`v2.2.07.11.2026.14.5.0`, etc.) and install updates with one tap.
+- **Obtainium (Auto-Updates from GitHub):** Add `https://github.com/SAT-Limited-Organization/SAT-Messenger` in Obtainium to automatically track versioned releases (`v4.2.07.11.2026.14.5.1`, etc.) and install updates with one tap.
 - **Verify Download Integrity:**
   ```bash
   sha256sum -c SHA256SUMS.txt
@@ -86,10 +86,11 @@ gradle :app:assembleRelease :app:bundleRelease
 - **Google Identity Sign-In:** Authenticate securely with **Google** (Jetpack `CredentialManager` + Firebase Auth) with automatic Cloud Firestore profile provisioning.
 - **Pre-Auth & In-App Manual:** A synchronized **App Manual & User Guide** is available directly on the Sign-In / Registration screen as well as inside the authenticated app, searchable by feature and category.
 
-### Contacts & Real-Time Availability
-- **Firestore-Synced Contact Directory:** Syncs registered user profiles in real time under `users/{userId}`.
+### Contacts, Find Friends & Real-Time Availability
+- **Firestore-Synced Contact Directory & Find Friends:** Syncs registered user profiles in real time under `users/{userId}` and correlates device phone contacts (`ContactsContract`) by email or phone number to surface registered friends on your device.
+- **5-Field Global Search & Dual Usernames:** Search users by Registered Name, Email, Phone Number, Primary `@username` (email prefix), or custom Secondary `@username` (changeable up to 3 times on an active change day with a 10-day cooldown).
 - **Live Availability Statuses:** Broadcast and view `Available`, `Busy`, `Away`, `In a Meeting`, `Do Not Disturb`, and `Offline` (with relative `Last seen` timestamps) across Contacts, Chats, Conversation Headers, and Profile.
-- **Friends & Filtering:** Star/unstar favorite contacts into your private `/users/{userId}/contacts/{contactId}` Friends list, filter by **All**, **Online**, **Friends**, or **Colleagues**, and search by name, `@handle`, email, phone, or availability.
+- **Two-Way Friend Requests & Filtering:** Send/accept/decline friend requests into `/users/{userId}/contacts/{contactId}`, filter by **All**, **Online**, **Friends**, **On Device**, **Requests**, or **Colleagues**, and inspect in-app GitHub Release updates in Profile & Settings.
 
 ### SAT Limited AI Assistant
 - **Powered by Firebase AI Logic & App Check:** Conversational AI assistant (`SAT Limited AI`) built directly into the Chats screen with multi-turn context, streaming answers, and zero hardcoded API keys.
@@ -102,7 +103,8 @@ gradle :app:assembleRelease :app:bundleRelease
 - **Voice Recording & Playback:** Record inline audio clips up to 90 seconds using the device microphone (`RECORD_AUDIO` runtime permission), preview before sending, and play/scrub directly inside chat bubbles.
 - **Photo, Video & Document Sharing:** Zero-permission Android Photo Picker (`ImageAndVideo`) and document attachment composer in Chats and Status, full-screen image viewer & inline `VideoView` clip player, and message deletion/chat clearing.
 
-### Admin Promotion, Flexible Channels, Communities & Status
+### Icons, Admin Promotion, Flexible Channels, Communities & Status
+- **Custom Profile, Group, Channel & Community Icons:** Change or remove your Profile avatar anytime, and let admins set, update, or remove icons for **Group Rooms**, **Channels**, and **Communities** via the zero-permission Photo Picker.
 - **Admin Promotion (Groups, Channels & Communities):** Creators and existing admins can promote or dismiss fellow members as Admins in **Group Rooms**, **Channels**, and **Communities**—backed by Cloud Firestore security rules that protect creators and prevent privilege escalation.
 - **Flexible Broadcast Channels:** Create public or invite-only channels with customizable categories, follower posting permissions, post reactions, and admin role management.
 - **Communities:** Group related departmental rooms and an announcements hub under shared communities with member/admin delegation.

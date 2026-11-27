@@ -29,12 +29,34 @@ service cloud.firestore {
       return data.userId is string && data.userId.size() <= 128 &&
              data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
              data.email is string && data.email.size() <= 200 &&
+             (!('primaryUsername' in data) || data.primaryUsername == null || (data.primaryUsername is string && data.primaryUsername.size() <= 100)) &&
+             (!('secondaryUsername' in data) || data.secondaryUsername == null || (data.secondaryUsername is string && data.secondaryUsername.size() >= 3 && data.secondaryUsername.size() <= 30)) &&
+             (!('secondaryUsernameLower' in data) || data.secondaryUsernameLower == null || (data.secondaryUsernameLower is string && data.secondaryUsernameLower.size() >= 3 && data.secondaryUsernameLower.size() <= 30)) &&
+             (!('secondaryUsernameDayKey' in data) || data.secondaryUsernameDayKey == null || (data.secondaryUsernameDayKey is string && data.secondaryUsernameDayKey.size() <= 20)) &&
+             (!('secondaryUsernameChangesInDay' in data) || data.secondaryUsernameChangesInDay == null || (data.secondaryUsernameChangesInDay is int && data.secondaryUsernameChangesInDay >= 0 && data.secondaryUsernameChangesInDay <= 3)) &&
+             (!('secondaryUsernameLastChangedAtMs' in data) || data.secondaryUsernameLastChangedAtMs == null || (data.secondaryUsernameLastChangedAtMs is int && data.secondaryUsernameLastChangedAtMs >= 0)) &&
              (!('phoneNumber' in data) || data.phoneNumber == null || (data.phoneNumber is string && data.phoneNumber.size() <= 30)) &&
              (!('avatarUrl' in data) || data.avatarUrl == null || (data.avatarUrl is string && data.avatarUrl.size() <= 500000)) &&
              (!('statusMessage' in data) || data.statusMessage == null || (data.statusMessage is string && data.statusMessage.size() <= 200)) &&
              (!('availabilityStatus' in data) || data.availabilityStatus == null || data.availabilityStatus in ['Available', 'Busy', 'Away', 'In a Meeting', 'Do Not Disturb', 'Offline']) &&
              (!('isOnline' in data) || data.isOnline is bool) &&
              (!('lastSeen' in data) || data.lastSeen == null || data.lastSeen is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt == null || data.updatedAt is timestamp);
+    }
+
+    function isValidFriendRequest(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.fromUserId is string && data.fromUserId.size() > 0 && data.fromUserId.size() <= 128 &&
+             data.toUserId is string && data.toUserId.size() > 0 && data.toUserId.size() <= 128 &&
+             data.fromUserId != data.toUserId &&
+             data.fromUserName is string && data.fromUserName.size() <= 100 &&
+             data.toUserName is string && data.toUserName.size() <= 100 &&
+             (!('fromUserAvatarUrl' in data) || data.fromUserAvatarUrl == null || (data.fromUserAvatarUrl is string && data.fromUserAvatarUrl.size() <= 500000)) &&
+             (!('toUserAvatarUrl' in data) || data.toUserAvatarUrl == null || (data.toUserAvatarUrl is string && data.toUserAvatarUrl.size() <= 500000)) &&
+             data.participantIds is list && data.participantIds.size() == 2 &&
+             data.fromUserId in data.participantIds &&
+             data.toUserId in data.participantIds &&
+             data.status in ['pending', 'accepted', 'declined'] &&
              (!('updatedAt' in data) || data.updatedAt == null || data.updatedAt is timestamp);
     }
 
@@ -63,6 +85,7 @@ service cloud.firestore {
              data.type in ['direct', 'group'] &&
              (!('name' in data) || data.name == null || (data.name is string && data.name.size() <= 100)) &&
              (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 500)) &&
+             (!('iconUrl' in data) || data.iconUrl == null || (data.iconUrl is string && data.iconUrl.size() <= 500000)) &&
              (!('inviteCode' in data) || data.inviteCode == null || (data.inviteCode is string && data.inviteCode.size() <= 64)) &&
              data.memberIds is list && data.memberIds.size() >= 1 && data.memberIds.size() <= 100 &&
              (!('adminIds' in data) || data.adminIds == null || (data.adminIds is list && data.adminIds.size() <= 20)) &&
@@ -78,6 +101,7 @@ service cloud.firestore {
       return data.id is string && data.id.size() <= 128 &&
              data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
              (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 500)) &&
+             (!('iconUrl' in data) || data.iconUrl == null || (data.iconUrl is string && data.iconUrl.size() <= 500000)) &&
              (!('inviteCode' in data) || data.inviteCode == null || (data.inviteCode is string && data.inviteCode.size() <= 64)) &&
              data.memberIds is list && data.memberIds.size() >= 1 && data.memberIds.size() <= 200 &&
              (!('adminIds' in data) || data.adminIds == null || (data.adminIds is list && data.adminIds.size() <= 50)) &&
@@ -428,6 +452,9 @@ service cloud.firestore {
 
       allow update: if isSignedIn() &&
                        isValidId(statusId) &&
+                       isValidStatus(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
                        (request.auth.uid == existing().userId ||
                         incoming().diff(existing()).affectedKeys().hasOnly(['viewerIds']));
 
@@ -564,6 +591,44 @@ service cloud.firestore {
                        isValidReport(incoming());
 
       allow read, update, delete: if false;
+    }
+
+    // 9. Friend Requests collection (Two-way friendship invitations)
+    match /friendRequests/{requestId} {
+      allow get: if isSignedIn() &&
+                    isValidId(requestId) &&
+                    request.auth.uid in resource.data.participantIds;
+
+      allow list: if isSignedIn() &&
+                     request.auth.uid in resource.data.participantIds;
+
+      allow create: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       incoming().id == requestId &&
+                       request.auth.uid == incoming().fromUserId &&
+                       incoming().status == 'pending' &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       isValidFriendRequest(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       request.auth.uid in existing().participantIds &&
+                       incoming().id == existing().id &&
+                       incoming().fromUserId == existing().fromUserId &&
+                       incoming().toUserId == existing().toUserId &&
+                       incoming().participantIds == existing().participantIds &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidFriendRequest(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                       (
+                         (request.auth.uid == existing().toUserId && existing().status == 'pending' && incoming().status in ['accepted', 'declined']) ||
+                         (request.auth.uid == existing().fromUserId && existing().status == 'declined' && incoming().status == 'pending')
+                       );
+
+      allow delete: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       request.auth.uid in existing().participantIds;
     }
   }
 }
