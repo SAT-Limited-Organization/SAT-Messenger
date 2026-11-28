@@ -99,6 +99,7 @@ import com.example.data.model.Channel
 import com.example.data.model.ChannelPost
 import com.example.data.model.UserProfile
 import com.example.ui.components.UserAvatar
+import com.example.ui.components.rememberDecodedImageRequest
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
@@ -436,9 +437,10 @@ fun ChannelsScreen(
                                 .background(SatElectricBlue.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (!channel.iconUrl.isNullOrBlank()) {
+                            val cardIconRequest = rememberDecodedImageRequest(channel.iconUrl)
+                            if (cardIconRequest != null) {
                                 AsyncImage(
-                                    model = channel.iconUrl,
+                                    model = cardIconRequest,
                                     contentDescription = channel.name,
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
@@ -644,12 +646,20 @@ fun ChannelFeedDialog(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(SatElectricBlue.copy(alpha = 0.2f)),
+                                    .background(SatElectricBlue.copy(alpha = 0.2f))
+                                    .then(
+                                        if (isAdmin) {
+                                            Modifier.clickable { showSettingsDialog = true }
+                                        } else {
+                                            Modifier
+                                        }
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (!channel.iconUrl.isNullOrBlank()) {
+                                val feedIconRequest = rememberDecodedImageRequest(channel.iconUrl)
+                                if (feedIconRequest != null) {
                                     AsyncImage(
-                                        model = channel.iconUrl,
+                                        model = feedIconRequest,
                                         contentDescription = channel.name,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()
@@ -836,10 +846,11 @@ fun ChannelFeedDialog(
                                         Text(text = post.text, style = MaterialTheme.typography.bodyLarge)
                                     }
 
-                                    if (!post.mediaUrl.isNullOrBlank()) {
+                                    val postMediaRequest = rememberDecodedImageRequest(post.mediaUrl)
+                                    if (postMediaRequest != null) {
                                         Spacer(modifier = Modifier.height(8.dp))
                                         AsyncImage(
-                                            model = post.mediaUrl,
+                                            model = postMediaRequest,
                                             contentDescription = "Channel post attachment",
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
@@ -893,14 +904,15 @@ fun ChannelFeedDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            if (!attachedImageBase64.isNullOrBlank()) {
+                            val composerImageRequest = rememberDecodedImageRequest(attachedImageBase64)
+                            if (composerImageRequest != null) {
                                 Box(
                                     modifier = Modifier
                                         .padding(bottom = 8.dp)
                                         .size(84.dp)
                                 ) {
                                     AsyncImage(
-                                        model = attachedImageBase64,
+                                        model = composerImageRequest,
                                         contentDescription = "Selected photo",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -1071,8 +1083,9 @@ fun ChannelFeedDialog(
                     .clickable { fullScreenImage = null },
                 contentAlignment = Alignment.Center
             ) {
+                val fullScreenRequest = rememberDecodedImageRequest(fullScreenImage, crossfade = false)
                 AsyncImage(
-                    model = fullScreenImage,
+                    model = fullScreenRequest ?: fullScreenImage,
                     contentDescription = "Full screen channel media",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
@@ -1171,9 +1184,10 @@ private fun CreateChannelDialog(
                             .background(SatElectricBlue.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!channelIconUrl.isNullOrBlank()) {
+                        val createIconRequest = rememberDecodedImageRequest(channelIconUrl)
+                        if (createIconRequest != null) {
                             AsyncImage(
-                                model = channelIconUrl,
+                                model = createIconRequest,
                                 contentDescription = "Channel Icon Preview",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
@@ -1398,9 +1412,10 @@ private fun ChannelSettingsDialog(
                             .background(SatElectricBlue.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!channel.iconUrl.isNullOrBlank()) {
+                        val settingsIconRequest = rememberDecodedImageRequest(channel.iconUrl)
+                        if (settingsIconRequest != null) {
                             AsyncImage(
-                                model = channel.iconUrl,
+                                model = settingsIconRequest,
                                 contentDescription = channel.name,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()

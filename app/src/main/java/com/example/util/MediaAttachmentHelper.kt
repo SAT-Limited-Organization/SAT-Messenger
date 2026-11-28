@@ -88,6 +88,29 @@ object MediaAttachmentHelper {
         )
     }
 
+    /**
+     * Converts `data:image/...;base64,...` data URLs into decoded [ByteArray] models because
+     * Coil 2.x does not ship a built-in `data:` URI fetcher, while preserving regular HTTP(S),
+     * content://, and file:// strings unchanged.
+     */
+    fun resolveImageModel(rawUrl: String?): Any? {
+        if (rawUrl.isNullOrBlank()) return null
+        val trimmed = rawUrl.trim()
+        if (trimmed.startsWith("data:", ignoreCase = true)) {
+            val base64MarkerIndex = trimmed.indexOf("base64,", ignoreCase = true)
+            if (base64MarkerIndex != -1) {
+                val base64Payload = trimmed.substring(base64MarkerIndex + "base64,".length)
+                if (base64Payload.isBlank()) return null
+                return try {
+                    Base64.decode(base64Payload, Base64.DEFAULT)
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+        return trimmed
+    }
+
     fun encodeVisualMedia(context: Context, uri: Uri): EncodedMediaResult {
         val mime = context.contentResolver.getType(uri).orEmpty().lowercase()
         val (displayName, sizeBytes) = getFileMetadata(context, uri)

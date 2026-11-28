@@ -26,4 +26,10 @@
     <string name="update_dialog_download">Download &amp; Install</string>
     <string name="update_dialog_github">View on GitHub</string>
     <string name="update_dialog_later">Later</string>
+    <string name="permissions_card_title">App Permissions &amp; Media Access</string>
+    <string name="permissions_card_subtitle">Manage permissions for contacts, voice clips, notifications, network sync, and zero-permission storage &amp; media access.</string>
+    <string name="permissions_storage_media_title">Storage &amp; Media Access</string>
+    <string name="permissions_storage_media_desc">Uses Android Photo Picker and Storage Access Framework for photos, videos, icons, and files without broad storage permissions.</string>
+    <string name="permissions_grant_missing">Grant Missing Permissions</string>
+    <string name="permissions_open_settings">Open Android App Settings</string>
 </resources>

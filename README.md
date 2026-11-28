@@ -9,7 +9,7 @@
 
 **SAT Messenger** is a native Kotlin and Jetpack Compose enterprise & team messaging application for **SAT Limited**, built on Material Design 3, Firebase Authentication (Google Credential Manager), and real-time Cloud Firestore synchronization.
 
-> **GitHub Pages Documentation:** Browse the full documentation, downloadable packages, and searchable web User Manual in [`docs/`](docs/index.html) (enable **Settings → Pages → Deploy from a branch → `/docs`** to publish at `https://sat-limited-organization.github.io/SAT-Messenger/`).
+> **GitHub Pages Documentation:** Browse the full documentation, downloadable packages, searchable web User Manual ([`docs/manual.html`](docs/manual.html)), and [Privacy Policy](docs/privacy.html) in [`docs/`](docs/index.html) (enable **Settings → Pages → Deploy from a branch → `/docs`** to publish at `https://sat-limited-organization.github.io/SAT-Messenger/`).
 
 ---
 

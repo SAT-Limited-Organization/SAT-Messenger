@@ -90,6 +90,7 @@ import coil.compose.AsyncImage
 import com.example.data.model.StatusItem
 import com.example.data.model.UserProfile
 import com.example.ui.components.UserAvatar
+import com.example.ui.components.rememberDecodedImageRequest
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
@@ -505,8 +506,9 @@ private fun StatusStoryViewerDialog(
                         )
                     }
                 } else {
+                    val statusImageRequest = rememberDecodedImageRequest(status.mediaUrl, crossfade = false)
                     AsyncImage(
-                        model = status.mediaUrl,
+                        model = statusImageRequest ?: status.mediaUrl,
                         contentDescription = "Status Media",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize()

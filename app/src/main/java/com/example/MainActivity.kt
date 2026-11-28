@@ -169,6 +169,14 @@ class MainActivity : ComponentActivity() {
                             ) == PackageManager.PERMISSION_GRANTED
                     )
                 }
+                var hasAudioPermission by remember {
+                    mutableStateOf(
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+                    )
+                }
                 var notificationBannerDismissed by remember { mutableStateOf(false) }
                 var showPreAuthManual by remember { mutableStateOf(false) }
 
@@ -177,6 +185,22 @@ class MainActivity : ComponentActivity() {
                         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                     }
                     context.startActivity(settingsIntent)
+                }
+
+                val openAppDetailsSettings: () -> Unit = {
+                    runCatching {
+                        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(settingsIntent)
+                    }.onFailure {
+                        Toast.makeText(
+                            context,
+                            "Unable to open Android App Settings.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
 
                 val openExternalUrl: (String) -> Unit = { url ->
@@ -210,6 +234,74 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val contactsPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    viewModel.refreshDeviceContactsPermission()
+                    if (granted) {
+                        viewModel.syncDeviceContacts(context, silent = false)
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "Contacts permission denied. Enable Contacts in Android App Settings to match device contacts.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+                val audioPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    hasAudioPermission = granted
+                    Toast.makeText(
+                        context,
+                        if (granted) {
+                            "Microphone permission granted for voice clips."
+                        } else {
+                            "Microphone permission denied. Enable Microphone in Android App Settings to record voice clips."
+                        },
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                val requiredPermissionsLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions()
+                ) { results ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val notifGranted = results[Manifest.permission.POST_NOTIFICATIONS]
+                            ?: (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED)
+                        hasNotificationPermission = notifGranted
+                        if (notifGranted) {
+                            notificationBannerDismissed = true
+                            viewModel.setSystemNotificationsEnabled(true)
+                        }
+                    }
+                    hasAudioPermission = results[Manifest.permission.RECORD_AUDIO]
+                        ?: (ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED)
+                    viewModel.refreshDeviceContactsPermission()
+                    val allGrantedNow = hasNotificationPermission &&
+                        hasAudioPermission &&
+                        (ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.READ_CONTACTS
+                        ) == PackageManager.PERMISSION_GRANTED)
+                    Toast.makeText(
+                        context,
+                        if (allGrantedNow) {
+                            "All required permissions granted."
+                        } else {
+                            "Permissions updated. Any denied permissions can be enabled in Android App Settings."
+                        },
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
                 val requestNotificationPermission: () -> Unit = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         val alreadyAsked = notificationPrefs.getBoolean("asked_post_notifications", false)
@@ -226,6 +318,114 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val requestContactsPermission: () -> Unit = {
+                    val isGranted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.READ_CONTACTS
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (isGranted) {
+                        viewModel.syncDeviceContacts(context, silent = false)
+                    } else {
+                        val alreadyAsked = notificationPrefs.getBoolean("asked_read_contacts", false)
+                        val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                            this@MainActivity,
+                            Manifest.permission.READ_CONTACTS
+                        )
+                        if (!alreadyAsked || shouldShowRationale) {
+                            notificationPrefs.edit().putBoolean("asked_read_contacts", true).apply()
+                            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                        } else {
+                            openAppDetailsSettings()
+                        }
+                    }
+                }
+
+                val requestAudioPermission: () -> Unit = {
+                    val isGranted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (isGranted) {
+                        hasAudioPermission = true
+                        Toast.makeText(
+                            context,
+                            "Microphone permission is already active.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        val alreadyAsked = notificationPrefs.getBoolean("asked_record_audio", false)
+                        val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                            this@MainActivity,
+                            Manifest.permission.RECORD_AUDIO
+                        )
+                        if (!alreadyAsked || shouldShowRationale) {
+                            notificationPrefs.edit().putBoolean("asked_record_audio", true).apply()
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            openAppDetailsSettings()
+                        }
+                    }
+                }
+
+                val requestAllMissingPermissions: () -> Unit = {
+                    val missing = buildList {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.READ_CONTACTS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            add(Manifest.permission.READ_CONTACTS)
+                        }
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            add(Manifest.permission.RECORD_AUDIO)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            add(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                    if (missing.isEmpty()) {
+                        Toast.makeText(
+                            context,
+                            "All required permissions are already granted.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        val canPromptAny = missing.any { perm ->
+                            val key = when (perm) {
+                                Manifest.permission.READ_CONTACTS -> "asked_read_contacts"
+                                Manifest.permission.RECORD_AUDIO -> "asked_record_audio"
+                                Manifest.permission.POST_NOTIFICATIONS -> "asked_post_notifications"
+                                else -> "asked_$perm"
+                            }
+                            !notificationPrefs.getBoolean(key, false) ||
+                                ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, perm)
+                        }
+                        if (canPromptAny) {
+                            val editor = notificationPrefs.edit()
+                            missing.forEach { perm ->
+                                when (perm) {
+                                    Manifest.permission.READ_CONTACTS -> editor.putBoolean("asked_read_contacts", true)
+                                    Manifest.permission.RECORD_AUDIO -> editor.putBoolean("asked_record_audio", true)
+                                    Manifest.permission.POST_NOTIFICATIONS -> editor.putBoolean("asked_post_notifications", true)
+                                }
+                            }
+                            editor.apply()
+                            requiredPermissionsLauncher.launch(missing.toTypedArray())
+                        } else {
+                            openAppDetailsSettings()
+                        }
+                    }
+                }
+
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
@@ -237,6 +437,11 @@ class MainActivity : ComponentActivity() {
                                         context,
                                         Manifest.permission.POST_NOTIFICATIONS
                                     ) == PackageManager.PERMISSION_GRANTED
+                                hasAudioPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+                                viewModel.refreshDeviceContactsPermission()
                             }
                             else -> Unit
                         }
@@ -517,7 +722,13 @@ class MainActivity : ComponentActivity() {
                                         onOpenUpdatePrompt = { viewModel.openUpdatePromptDialog() },
                                         onDownloadUpdate = { release ->
                                             openExternalUrl(release.apkDownloadUrl ?: release.releasePageUrl)
-                                        }
+                                        },
+                                        hasContactsPermission = hasDeviceContactsPermission,
+                                        hasMicrophonePermission = hasAudioPermission,
+                                        onRequestContactsPermission = requestContactsPermission,
+                                        onRequestMicrophonePermission = requestAudioPermission,
+                                        onRequestAllRequiredPermissions = requestAllMissingPermissions,
+                                        onOpenAppSettings = openAppDetailsSettings
                                     )
                                 }
 

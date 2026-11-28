@@ -292,14 +292,14 @@ private val MANUAL_SECTIONS = listOf(
         title = "Photos, Media & Document Sharing",
         icon = Icons.Default.AttachFile,
         badge = "Zero-Permission",
-        summary = "Share photos, short video clips, and files securely in chats and status using Android's zero-permission Photo Picker.",
+        summary = "Share photos, short video clips, and documents securely using Android's zero-permission Photo Picker & Storage Access Framework.",
         steps = listOf(
-            "Tap the Image icon in the chat composer (or the paperclip icon > 'Photo & Video' / 'Document & Files').",
-            "Select a photo, video clip, or file, review the preview dialog, add an optional caption, and tap Send.",
+            "Tap the Image icon in the chat composer (or the paperclip icon > 'Photo & Video' or 'Document & Files').",
+            "Pick photos/videos via Photo Picker (PickVisualMedia) or documents via Storage Access Framework (OpenDocument), add an optional caption, and tap Send.",
             "Tap any image or video card inside a conversation to open the full-screen viewer/player, or browse shared items under Contact / Group Info."
         ),
         tips = listOf(
-            "Photos are compressed automatically and clips are validated under real-time sync limits with zero broad storage permissions."
+            "Photos are compressed automatically and clips/files work without broad device storage permissions."
         )
     ),
     ManualSection(
@@ -414,6 +414,24 @@ private val MANUAL_SECTIONS = listOf(
         )
     ),
     ManualSection(
+        id = "app_permissions",
+        category = "Permissions & Storage",
+        title = "App Permissions, Storage & Media Access",
+        icon = Icons.Default.Security,
+        badge = "Play-Compliant",
+        summary = "Review and manage permissions for Storage & Media, Contacts, Microphone, Notifications, and Network sync.",
+        steps = listOf(
+            "Storage & Media (Zero-Permission): Photo, video, icon, and document picking use Android's official Photo Picker and Storage Access Framework (OpenDocument) without requiring broad storage permissions.",
+            "Contacts (READ_CONTACTS): Requested only when scanning phone contacts in Contacts or Find Friends to highlight registered colleagues.",
+            "Microphone (RECORD_AUDIO): Requested only when tapping the Microphone button to record an in-chat voice note.",
+            "Notifications (POST_NOTIFICATIONS): Requested on Android 13+ so incoming messages appear in your Notification Center.",
+            "Open Profile & Settings > App Permissions & Media Access anytime to check status badges, grant missing permissions together, or open Android App Settings."
+        ),
+        tips = listOf(
+            "INTERNET and ACCESS_NETWORK_STATE operate automatically at install time for real-time Firestore sync, SAT Limited AI, and GitHub update checks."
+        )
+    ),
+    ManualSection(
         id = "downloads_and_updates",
         category = "Downloads & Updates",
         title = "Downloads, Updates & Sideloading",
@@ -462,6 +480,7 @@ fun AppManualScreen(
         "Chat Management",
         "Real-Time & Receipts",
         "Privacy & Safety",
+        "Permissions & Storage",
         "Downloads & Updates"
     )
 

@@ -36,12 +36,18 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -70,15 +76,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.model.AvailabilityStatus
 import com.example.data.model.BlockedUser
 import com.example.data.model.PrivacySettings
@@ -124,6 +134,12 @@ fun ProfileScreen(
     onCheckForUpdates: () -> Unit = {},
     onOpenUpdatePrompt: () -> Unit = {},
     onDownloadUpdate: (AppReleaseInfo) -> Unit = {},
+    hasContactsPermission: Boolean = true,
+    hasMicrophonePermission: Boolean = true,
+    onRequestContactsPermission: () -> Unit = {},
+    onRequestMicrophonePermission: () -> Unit = {},
+    onRequestAllRequiredPermissions: () -> Unit = {},
+    onOpenAppSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -757,6 +773,198 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // App Permissions & Storage / Media Access Card
+                val grantedRuntimeCount = listOf(
+                    hasContactsPermission,
+                    hasMicrophonePermission,
+                    hasNotificationPermission
+                ).count { it }
+                val hasMissingRuntimePermissions = grantedRuntimeCount < 3
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("app_permissions_card")
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Security,
+                                    contentDescription = null,
+                                    tint = SatElectricBlue
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.permissions_card_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (!hasMissingRuntimePermissions) {
+                                    SatOnlineGreen.copy(alpha = 0.15f)
+                                } else {
+                                    SatTeal.copy(alpha = 0.15f)
+                                }
+                            ) {
+                                Text(
+                                    text = "$grantedRuntimeCount/3 Runtime + Media",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (!hasMissingRuntimePermissions) SatOnlineGreen else SatTeal,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = stringResource(R.string.permissions_card_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        PermissionStatusRow(
+                            icon = Icons.Default.PermMedia,
+                            iconTint = SatOnlineGreen,
+                            title = stringResource(R.string.permissions_storage_media_title),
+                            description = stringResource(R.string.permissions_storage_media_desc),
+                            statusLabel = "Zero-Permission Active",
+                            statusColor = SatOnlineGreen,
+                            statusTag = "permission_storage_media_status"
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+
+                        PermissionStatusRow(
+                            icon = Icons.Default.People,
+                            iconTint = SatElectricBlue,
+                            title = "Contacts (READ_CONTACTS)",
+                            description = "Scans device contacts to highlight registered colleagues and populate Find Friends.",
+                            statusLabel = if (hasContactsPermission) "Allowed" else "Permission Needed",
+                            statusColor = if (hasContactsPermission) SatOnlineGreen else SatErrorRed,
+                            statusTag = "permission_contacts_status",
+                            actionLabel = if (!hasContactsPermission) "Allow Contacts" else null,
+                            actionTag = "grant_contacts_permission_button",
+                            onActionClick = onRequestContactsPermission
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+
+                        PermissionStatusRow(
+                            icon = Icons.Default.Mic,
+                            iconTint = SatTeal,
+                            title = "Microphone (RECORD_AUDIO)",
+                            description = "Records voice clips directly inside direct and group conversations.",
+                            statusLabel = if (hasMicrophonePermission) "Allowed" else "Permission Needed",
+                            statusColor = if (hasMicrophonePermission) SatOnlineGreen else SatErrorRed,
+                            statusTag = "permission_microphone_status",
+                            actionLabel = if (!hasMicrophonePermission) "Allow Mic" else null,
+                            actionTag = "grant_microphone_permission_button",
+                            onActionClick = onRequestMicrophonePermission
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+
+                        PermissionStatusRow(
+                            icon = Icons.Default.Notifications,
+                            iconTint = SatElectricBlue,
+                            title = "Notifications (POST_NOTIFICATIONS)",
+                            description = "Shows incoming message alerts and channel broadcasts in Notification Center.",
+                            statusLabel = if (hasNotificationPermission) "Allowed" else "Permission Needed",
+                            statusColor = if (hasNotificationPermission) SatOnlineGreen else SatErrorRed,
+                            statusTag = "permission_notifications_status",
+                            actionLabel = if (!hasNotificationPermission) "Allow Alerts" else null,
+                            actionTag = "grant_notifications_permission_card_button",
+                            onActionClick = onRequestNotificationPermission
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+
+                        PermissionStatusRow(
+                            icon = Icons.Default.Sync,
+                            iconTint = SatTeal,
+                            title = "Network & Real-Time Sync",
+                            description = "Required for Cloud Firestore messaging, SAT Limited AI, and GitHub update checks.",
+                            statusLabel = "Install-Time Active",
+                            statusColor = SatTeal,
+                            statusTag = "permission_network_status"
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (hasMissingRuntimePermissions) {
+                            Button(
+                                onClick = onRequestAllRequiredPermissions,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("grant_required_permissions_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VerifiedUser,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.permissions_grant_missing))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
+                        OutlinedButton(
+                            onClick = onOpenAppSettings,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .minimumInteractiveComponentSize()
+                                .testTag("open_android_app_settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = SatElectricBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.permissions_open_settings))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 // Blocked Users Section
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -938,6 +1146,78 @@ fun ProfileScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun PermissionStatusRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    description: String,
+    statusLabel: String,
+    statusColor: Color,
+    statusTag: String,
+    actionLabel: String? = null,
+    actionTag: String? = null,
+    onActionClick: (() -> Unit)? = null
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = statusColor.copy(alpha = 0.14f),
+                modifier = Modifier.testTag(statusTag)
+            ) {
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (actionLabel != null && actionTag != null && onActionClick != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onActionClick,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag(actionTag)
+            ) {
+                Text(actionLabel)
+            }
         }
     }
 }

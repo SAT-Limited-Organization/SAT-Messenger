@@ -83,6 +83,7 @@ import com.example.audio.VoicePlaybackState
 import com.example.audio.formatAudioDuration
 import com.example.data.model.Message
 import com.example.data.model.UserProfile
+import com.example.ui.components.rememberDecodedImageRequest
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatElectricBlueLight
 import com.example.ui.theme.SatIncomingBubbleDark
@@ -283,11 +284,9 @@ fun MessageBubble(
                                 .background(if (isOutgoing) Color.Black.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
                                 .clickable { onImageClick?.invoke(message.attachmentUrl) }
                         ) {
+                            val attachmentImageRequest = rememberDecodedImageRequest(message.attachmentUrl)
                             AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(message.attachmentUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                model = attachmentImageRequest ?: message.attachmentUrl,
                                 contentDescription = "Shared photo",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

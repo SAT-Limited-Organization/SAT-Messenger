@@ -943,6 +943,15 @@ class MessengerViewModel(
         }
     }
 
+    fun refreshDeviceContactsPermission() {
+        val granted = contactDiscoveryService.hasReadContactsPermission(appContext)
+        val wasGranted = _hasDeviceContactsPermission.value
+        _hasDeviceContactsPermission.value = granted
+        if (granted && !wasGranted) {
+            syncDeviceContacts(appContext, silent = true)
+        }
+    }
+
     fun syncDeviceContacts(context: Context = appContext, silent: Boolean = false) {
         val granted = contactDiscoveryService.hasReadContactsPermission(context)
         _hasDeviceContactsPermission.value = granted

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
@@ -28,14 +29,18 @@ import com.example.ui.screens.ai.SatLimitedAiScreen
 import com.example.ui.screens.channels.ChannelFeedDialog
 import com.example.ui.screens.chat.ChatDetailsScreen
 import com.example.ui.screens.communities.CommunitiesScreen
+import com.example.ui.screens.manual.AppManualScreen
 import com.example.ui.screens.profile.ProfileScreen
 import com.example.ui.screens.status.StatusScreen
 import com.example.ui.theme.SATMessengerTheme
+import com.example.util.MediaAttachmentHelper
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -486,5 +491,109 @@ class FeaturesUiAndAiTest {
 
         assertEquals("comm_icon_1", updatedCommunityId)
         assertEquals(null, updatedIcon)
+    }
+
+    @Test
+    fun mediaAttachmentHelper_resolveImageModel_decodesDataUriAndPreservesHttps() {
+        val sampleBytes = byteArrayOf(0x01, 0x02, 0x03, 0x7F)
+        val b64 = android.util.Base64.encodeToString(sampleBytes, android.util.Base64.NO_WRAP)
+        val decoded = MediaAttachmentHelper.resolveImageModel("data:image/jpeg;base64,$b64")
+        assertTrue(decoded is ByteArray)
+        assertArrayEquals(sampleBytes, decoded as ByteArray)
+
+        assertEquals(
+            "https://example.com/icon.png",
+            MediaAttachmentHelper.resolveImageModel("  https://example.com/icon.png  ")
+        )
+        assertNull(MediaAttachmentHelper.resolveImageModel("   "))
+        assertNull(MediaAttachmentHelper.resolveImageModel(null))
+    }
+
+    @Test
+    fun androidManifest_declaresAllRequiredLeastPrivilegePermissions() {
+        val packageInfo = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_PERMISSIONS
+        )
+        val requested = packageInfo.requestedPermissions?.toSet() ?: emptySet()
+        assertTrue(requested.contains(Manifest.permission.INTERNET))
+        assertTrue(requested.contains(Manifest.permission.ACCESS_NETWORK_STATE))
+        assertTrue(requested.contains(Manifest.permission.POST_NOTIFICATIONS))
+        assertTrue(requested.contains(Manifest.permission.RECORD_AUDIO))
+        assertTrue(requested.contains(Manifest.permission.READ_CONTACTS))
+        assertFalse(requested.contains("android.permission.READ_EXTERNAL_STORAGE"))
+        assertFalse(requested.contains("android.permission.WRITE_EXTERNAL_STORAGE"))
+        assertFalse(requested.contains("android.permission.READ_MEDIA_IMAGES"))
+        assertFalse(requested.contains("android.permission.READ_MEDIA_VIDEO"))
+    }
+
+    @Test
+    fun profileScreen_displaysAppPermissionsAndStorageMediaControls() {
+        var contactsRequested = false
+        var micRequested = false
+        var notifRequested = false
+        var allRequested = false
+        var openedSettings = false
+
+        composeRule.setContent {
+            SATMessengerTheme {
+                ProfileScreen(
+                    userProfile = UserProfile(
+                        userId = "u_perm",
+                        displayName = "Alex Perm",
+                        email = "alex@satlimited.com"
+                    ),
+                    privacySettings = PrivacySettings(userId = "u_perm"),
+                    blockedUsers = emptyList(),
+                    onBack = {},
+                    onUpdateProfile = { _, _, _ -> },
+                    onUpdatePrivacy = { _, _ -> },
+                    onUnblockUser = {},
+                    onSignOut = {},
+                    onDeleteAccount = {},
+                    hasNotificationPermission = false,
+                    hasContactsPermission = false,
+                    hasMicrophonePermission = false,
+                    onRequestNotificationPermission = { notifRequested = true },
+                    onRequestContactsPermission = { contactsRequested = true },
+                    onRequestMicrophonePermission = { micRequested = true },
+                    onRequestAllRequiredPermissions = { allRequested = true },
+                    onOpenAppSettings = { openedSettings = true }
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("app_permissions_card").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("permission_storage_media_status").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Zero-Permission Active").performScrollTo().assertIsDisplayed()
+
+        composeRule.onNodeWithTag("grant_contacts_permission_button").performScrollTo().performClick()
+        composeRule.onNodeWithTag("grant_microphone_permission_button").performScrollTo().performClick()
+        composeRule.onNodeWithTag("grant_notifications_permission_card_button").performScrollTo().performClick()
+        composeRule.onNodeWithTag("grant_required_permissions_button").performScrollTo().performClick()
+        composeRule.onNodeWithTag("open_android_app_settings_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertTrue(contactsRequested)
+        assertTrue(micRequested)
+        assertTrue(notifRequested)
+        assertTrue(allRequested)
+        assertTrue(openedSettings)
+    }
+
+    @Test
+    fun appManualScreen_documentsAppPermissionsAndStorageMedia() {
+        composeRule.setContent {
+            SATMessengerTheme {
+                AppManualScreen(onBack = {})
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("manual_search_field").performTextInput("Storage & Media")
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("manual_card_app_permissions").performScrollTo().assertIsDisplayed()
     }
 }

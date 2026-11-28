@@ -78,6 +78,7 @@ import com.example.data.model.Chat
 import com.example.data.model.Community
 import com.example.data.model.UserProfile
 import com.example.ui.components.UserAvatar
+import com.example.ui.components.rememberDecodedImageRequest
 import com.example.ui.theme.SatElectricBlue
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatNavyDark
@@ -266,9 +267,10 @@ fun CommunitiesScreen(
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (!community.iconUrl.isNullOrBlank()) {
+                                    val iconRequest = rememberDecodedImageRequest(community.iconUrl)
+                                    if (iconRequest != null) {
                                         AsyncImage(
-                                            model = community.iconUrl,
+                                            model = iconRequest,
                                             contentDescription = community.name,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
@@ -534,9 +536,10 @@ private fun CommunityIconEditorCard(
                     .background(SatElectricBlue),
                 contentAlignment = Alignment.Center
             ) {
-                if (!community.iconUrl.isNullOrBlank()) {
+                val dialogIconRequest = rememberDecodedImageRequest(community.iconUrl)
+                if (dialogIconRequest != null) {
                     AsyncImage(
-                        model = community.iconUrl,
+                        model = dialogIconRequest,
                         contentDescription = community.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -819,9 +822,10 @@ private fun CreateCommunityDialog(
                             .background(SatElectricBlue),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!communityIconUrl.isNullOrBlank()) {
+                        val previewIconRequest = rememberDecodedImageRequest(communityIconUrl)
+                        if (previewIconRequest != null) {
                             AsyncImage(
-                                model = communityIconUrl,
+                                model = previewIconRequest,
                                 contentDescription = "Community Icon Preview",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()

@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +45,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.AvailabilityStatus
 import com.example.ui.theme.SatElectricBlue
+import com.example.util.MediaAttachmentHelper
 import com.example.ui.theme.SatErrorRed
 import com.example.ui.theme.SatOnlineGreen
 import com.example.ui.theme.SatSlate400
@@ -119,6 +121,22 @@ fun AvailabilityStatusPill(
 }
 
 @Composable
+fun rememberDecodedImageRequest(
+    urlOrDataUri: String?,
+    crossfade: Boolean = true
+): ImageRequest? {
+    val context = LocalContext.current
+    return remember(context, urlOrDataUri, crossfade) {
+        val model = MediaAttachmentHelper.resolveImageModel(urlOrDataUri) ?: return@remember null
+        ImageRequest.Builder(context)
+            .data(model)
+            .memoryCacheKey(urlOrDataUri)
+            .crossfade(crossfade)
+            .build()
+    }
+}
+
+@Composable
 fun UserAvatar(
     name: String,
     avatarUrl: String? = null,
@@ -140,12 +158,10 @@ fun UserAvatar(
     }
 
     Box(modifier = outerModifier) {
-        if (!avatarUrl.isNullOrBlank()) {
+        val imageRequest = rememberDecodedImageRequest(avatarUrl)
+        if (imageRequest != null) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
-                    .crossfade(true)
-                    .build(),
+                model = imageRequest,
                 contentDescription = name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.model.AvailabilityStatus
@@ -187,8 +188,8 @@ class FriendsAndStatusUiTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("profile_primary_username_text").assertIsDisplayed()
-        composeRule.onNodeWithTag("secondary_username_input").performTextInput("simba_cmd")
-        composeRule.onNodeWithTag("save_secondary_username_button").performClick()
+        composeRule.onNodeWithTag("secondary_username_input").performScrollTo().performTextInput("simba_cmd")
+        composeRule.onNodeWithTag("save_secondary_username_button").performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals("simba_cmd", submittedUsername)
     }

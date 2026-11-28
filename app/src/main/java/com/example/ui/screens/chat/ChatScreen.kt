@@ -143,6 +143,7 @@ import com.example.data.model.Message
 import com.example.data.model.UserProfile
 import com.example.ui.components.EmptyStateView
 import com.example.ui.components.MessageBubble
+import com.example.ui.components.rememberDecodedImageRequest
 import com.example.ui.components.MessageStatusIndicator
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.VoicePreviewComposerBar
@@ -337,8 +338,8 @@ fun ChatScreen(
         } else {
             Toast.makeText(
                 context,
-                "Microphone permission is required to record voice clips.",
-                Toast.LENGTH_SHORT
+                "Microphone permission is required to record voice clips. Enable it in Profile > App Permissions or Settings.",
+                Toast.LENGTH_LONG
             ).show()
         }
     }
@@ -384,7 +385,7 @@ fun ChatScreen(
     }
 
     val documentPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
             val encodedResult = MediaAttachmentHelper.encodeDocumentOrFile(context, uri)
@@ -833,7 +834,7 @@ fun ChatScreen(
                                         },
                                         onClick = {
                                             showAttachmentMenu = false
-                                            documentPickerLauncher.launch("*/*")
+                                            documentPickerLauncher.launch(arrayOf("*/*"))
                                         },
                                         modifier = Modifier.testTag("pick_doc_menu_item")
                                     )
@@ -1197,8 +1198,9 @@ fun ChatScreen(
                     .clickable { fullScreenImageUri = null },
                 contentAlignment = Alignment.Center
             ) {
+                val fullScreenRequest = rememberDecodedImageRequest(fullScreenImageUri, crossfade = false)
                 AsyncImage(
-                    model = fullScreenImageUri,
+                    model = fullScreenRequest ?: fullScreenImageUri,
                     contentDescription = "Full Screen Media",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
